@@ -4,6 +4,8 @@ import Navbar from "./components/Navbar";
 import ProjectFeed from "./pages/ProjectFeed";
 import ProjectDetails from "./pages/ProjectDetails";
 import ProjectForm from "./pages/ProjectForm";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
 
 export default function App() {
   return (
@@ -12,6 +14,10 @@ export default function App() {
 
       <Routes>
         <Route path="/" element={<Navigate to="/projects" replace />} />
+
+        <Route path="/login" element={<Login />} />
+
+        <Route path="/signup" element={<Signup />} />
 
         <Route path="/projects" element={<ProjectFeed />} />
 
