@@ -7,6 +7,26 @@ test('complete authenticated project and threaded comment lifecycle', async ({pa
  await expect(page.getByRole('heading',{name:'Create a Project'})).toBeVisible();
  await page.getByLabel('Project Title *',{exact:true}).fill('Browser project'); await page.getByLabel('Description *',{exact:true}).fill('A real API project'); await page.getByRole('button',{name:'Create Project',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Browser project'})).toBeVisible(); const projectUrl = page.url();
+
+// Check that a project saved through the API appears in the community feed.
+await page.goto('/projects');
+
+// Make sure the newly created project appears.
+const projectCard = page.locator('.project-card').filter({
+  has: page.getByRole('heading', { name: 'Browser project' })
+});
+
+await expect(projectCard).toBeVisible();
+
+// Open the project from the community feed.
+await projectCard.getByRole('link', { name: /View Project/ }).click();
+
+// Verify that the correct project details page opens.
+await expect(page).toHaveURL(projectUrl);
+await expect(
+  page.getByRole('heading', { name: 'Browser project' })
+).toBeVisible();
+
  await page.getByRole('link',{name:'Edit Project',exact:true}).click(); await page.getByLabel('Project Title *',{exact:true}).fill('Updated project'); await page.getByRole('button',{name:'Save Changes'}).click(); await expect(page.getByRole('heading',{name:'Updated project'})).toBeVisible();
  await page.getByLabel('Your comment',{exact:true}).fill('Root comment'); await page.getByRole('button',{name:'Save comment',exact:true}).click(); await expect(page.getByText('Root comment',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Edit comment',exact:true}).click(); await page.getByLabel('Edit comment',{exact:true}).fill('Edited root'); await page.getByRole('button',{name:'Save comment',exact:true}).first().click(); await expect(page.getByText('Edited root',{exact:true})).toBeVisible();
