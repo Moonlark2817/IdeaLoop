@@ -224,3 +224,8 @@ Protected navigation returns to the intended page after login.
 
 Commands: `npm run client:typecheck`, `npm run client:test`, and
 `npm run client:build`. Existing root commands continue to run the backend.
+
+Project browsing includes pagination, loading/error/empty states, and retry.
+Only project owners see edit/delete controls, and editing another user's project
+is blocked. Forms follow backend title and URL limits and retain input after
+recoverable errors. Deletion confirmation explains its cascading effects.

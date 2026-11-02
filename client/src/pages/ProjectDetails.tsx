@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { deleteProject, getProject } from "../api";
+import { deleteProject, getProject, safeUrl } from "../api";
+import { useAuth } from '../auth';
 import type { Project } from "../types";
 
 export default function ProjectDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
@@ -13,29 +15,16 @@ export default function ProjectDetails() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    async function loadProject() {
-      try {
-        if (!id) throw new Error("Project ID is missing.");
-
-        const data = await getProject(id);
-        setProject(data);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Unable to load project."
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadProject();
+    const controller = new AbortController(); setLoading(true); setError(''); setProject(null);
+    getProject(id!, controller.signal).then(setProject).catch(err => {if (err.name !== 'AbortError') setError(err.message);}).finally(() => {if (!controller.signal.aborted) setLoading(false);});
+    return () => controller.abort();
   }, [id]);
 
   async function handleDelete() {
-    if (!id || !project) return;
+    if (!id || !project || deleting || project.user_id !== user?.id) return;
 
     const confirmed = window.confirm(
-      "Are you sure you want to delete this project? This action cannot be undone."
+      "Are you sure you want to delete this project? All media, comments and replies, likes, saves, and project-linked collaboration requests will also be deleted. This cannot be undone."
     );
 
     if (!confirmed) return;
@@ -56,7 +45,7 @@ export default function ProjectDetails() {
     return <main className="page-container">Loading project...</main>;
   }
 
-  if (error || !project) {
+  if (!project) {
     return (
       <main className="page-container">
         <p className="error-message">{error || "Project not found."}</p>
@@ -88,7 +77,7 @@ export default function ProjectDetails() {
 
         <p className="project-meta">
           Project #{project.id} · Created{" "}
-          {new Date(project.created_at).toLocaleDateString()}
+          {project.created_at ? new Date(project.created_at).toLocaleDateString() : 'Unknown date'}
         </p>
 
         <div className="details-section">
@@ -96,12 +85,12 @@ export default function ProjectDetails() {
           <p className="details-description">{project.description}</p>
         </div>
 
-        {project.project_url && (
+        {safeUrl(project.project_url) && (
           <div className="details-section">
             <h2>Project Link</h2>
 
             <a
-              href={project.project_url}
+              href={project.project_url!}
               target="_blank"
               rel="noopener noreferrer"
               className="text-link"
@@ -111,7 +100,8 @@ export default function ProjectDetails() {
           </div>
         )}
 
-        <div className="details-actions">
+        {error && <p role="alert" className="error-message">{error}</p>}
+        {user?.id === project.user_id && <div className="details-actions">
           <Link
             to={`/projects/${project.id}/edit`}
             className="primary-button"
@@ -126,7 +116,7 @@ export default function ProjectDetails() {
           >
             {deleting ? "Deleting..." : "Delete Project"}
           </button>
-        </div>
+        </div>}
       </article>
     </main>
   );
