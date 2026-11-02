@@ -9,7 +9,12 @@
     "build": "tsc",
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "client:install": "npm ci --prefix client",
+    "client:dev": "npm run dev --prefix client",
+    "client:typecheck": "npm run typecheck --prefix client",
+    "client:test": "npm test --prefix client",
+    "client:build": "npm run build --prefix client"
   },
   "repository": {
     "type": "git",

@@ -432,3 +432,11 @@ textarea {
     display: none;
   }
 }
+:focus-visible { outline: 3px solid #286f91; outline-offset: 3px; }
+.skip-link { position: absolute; left: 10px; top: -80px; padding: 12px; background: white; z-index: 10; }
+.skip-link:focus { top: 10px; }
+.navbar, .nav-links { flex-wrap: wrap; gap: 15px; }
+button { cursor: pointer; }
+button:disabled { opacity: .55; cursor: not-allowed; }
+.project-card, .details-card, .comment { overflow-wrap: anywhere; }
+@media (max-width: 600px) { .feed-header { align-items: flex-start; gap: 15px; flex-direction: column; } }

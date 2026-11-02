@@ -15,3 +15,4 @@ export interface ProjectInput {
   project_url: string | null;
   is_seeking_collaborators: boolean;
 }
+export interface User { id: number; username: string; email: string; bio: string | null; avatar_url: string | null }
