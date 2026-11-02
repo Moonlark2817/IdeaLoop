@@ -2,7 +2,7 @@
 
 IdeaLoop lets creatives share projects across coding, art, music, writing, and crafts, discover work through tags and skills, and connect through learning and collaboration requests.
 
-This repository currently contains the Express + TypeScript backend and PostgreSQL schema. Backend source lives in root `src/`; the `client/` and `server/` split in the project structure reference has not been introduced.
+This repository contains the Express + TypeScript backend, PostgreSQL schema, and React frontend. Backend source lives in root `src/`; the React frontend lives in `client/`.
 
 ## Local setup
 
@@ -72,7 +72,7 @@ src/
   tests/                     Configuration, HTTP, and database integration tests
 ```
 
-User CRUD and basic registration/login are implemented. Request endpoints, uploads, password recovery, email verification, and the React frontend remain future work. Cross-origin frontend access is not configured yet; configure the allowed frontend origin when the client is introduced.
+User CRUD and basic registration/login are implemented. Request endpoints, uploads, password recovery, and email verification remain future work. The React frontend is in `client/` and uses a development API proxy; see below.
 
 ## Database
 
@@ -202,3 +202,49 @@ curl -X PATCH http://localhost:5000/api/projects/1/comments/1 \
 ```
 
 Replace example project/comment IDs with actual IDs. Deleting a comment permanently deletes all descendant replies, including replies written by other users. Deleting a project removes its comments; deleting an account removes its authored comments and their descendant replies. Unrelated comments remain. No schema migration is required for this API.
+
+## React frontend
+
+The client is based on Charlie (`cschicch`)'s `client/` implementation from
+`d7cab9b50d6be693e6da352d156f5deb20232795` on `charlie-sprint2`, merged into main
+by PR #90 (`e85722f`). Authentication, comments, and integration tests extend that
+merged client; Charlie's original authorship remains in the upstream history.
+
+Run `npm run client:install`, then start the backend with `npm run dev` and the
+client with `npm run client:dev` in separate terminals. Visit http://localhost:5173.
+Use Node.js 22.12 or later for the frontend tooling.
+Copy `client/.env.example` to `client/.env` to override `API_PROXY_TARGET` when the
+API runs somewhere other than http://127.0.0.1:5000. Browser requests always use
+relative `/api` paths. Never put database credentials or JWT secrets in client files.
+
+Authentication supports registration, login, logout, and session restoration via
+`/api/users/me`. Tokens live in session storage (per browser tab), expire according
+to the backend, and are removed when the API rejects authenticated requests.
+Protected navigation returns to the intended page after login.
+
+Commands: `npm run client:typecheck`, `npm run client:test`, and
+`npm run client:build`. Existing root commands continue to run the backend.
+
+The frontend includes public project browsing with pagination, owner-only project
+forms/deletion, and threaded comments with posting, replies, editing, and deletion.
+Deleting a project or parent comment asks for confirmation and explains cascading
+deletion. When a reply's parent is outside the loaded comment range, its context
+can be fetched separately. API failures preserve drafts and show actionable errors.
+
+Use Node.js 22.12+ for the frontend tooling. For browser acceptance tests, first run
+`npm exec --prefix client -- playwright install chromium`, then `npm run client:e2e`.
+The Playwright configuration starts the real Express app on port 5001 with a fresh,
+in-memory PGlite database and Vite on port 5174. No PostgreSQL service, `.env`, or
+production database credentials are used. Both ports must be free. The harness is
+separate from normal server startup and is never used by `npm start`.
+
+Frontend unit/component tests use Vitest, Testing Library, and mocked HTTP responses.
+Browser tests cover authentication, project CRUD, comment threads, permissions,
+confirmation cancellation, session expiry, direct routes, mobile navigation, and
+server failures. Browser artifacts are ignored by Git.
+
+`npm run client:build` writes `client/dist/`. Production hosting must serve those
+assets and route `/api` to the Express backend on the same origin. Route other
+non-asset URLs to `client/dist/index.html` for browser-router deep links; do not
+route unknown API requests to the SPA. The Vite proxy is development-only. Hosting
+and deployment are intentionally not configured by this change.
