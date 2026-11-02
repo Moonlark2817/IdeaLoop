@@ -72,7 +72,7 @@ src/
   tests/                     Configuration, HTTP, and database integration tests
 ```
 
-User CRUD and basic registration/login are implemented. Project/comment/request endpoints, uploads, password recovery, email verification, and the React frontend remain future work. Cross-origin frontend access is not configured yet; configure the allowed frontend origin when the client is introduced.
+User CRUD and basic registration/login are implemented. Request endpoints, uploads, password recovery, email verification, and the React frontend remain future work. Cross-origin frontend access is not configured yet; configure the allowed frontend origin when the client is introduced.
 
 ## Database
 
@@ -131,3 +131,74 @@ Registration and login share an in-memory limit of 20 requests per IP per 15 min
 Migration `005_user_identity` adds case-insensitive unique indexes without rewriting existing migrations. Existing databases with case-only duplicate usernames or emails must resolve those duplicates before applying it. The raw SQL alternative includes equivalent indexes in `db/modules/05_user_identity.sql`.
 
 Tests run the real migrations and Kysely queries against in-memory PostgreSQL using PGlite. Coverage includes user CRUD, input validation, privacy, authentication, owner-only mutations, password-change token invalidation, duplicate/racing registrations, rate limits, cascading deletes, and the new migration's rollback. No external database is required for tests.
+
+
+## Project API
+
+Project reads are public. Creation requires a Bearer token; updates and deletion require the project owner.
+
+| Method | Endpoint | Result |
+| --- | --- | --- |
+| POST | `/api/projects` | 201 with `{ project }` and a Location header |
+| GET | `/api/projects?limit=20&offset=0` | `{ projects, pagination: { limit, offset } }`, ordered by ascending ID; maximum limit 100 |
+| GET | `/api/projects/:id` | `{ project }` |
+| PATCH | `/api/projects/:id` | Partial update returning `{ project }` |
+| DELETE | `/api/projects/:id` | 204 without a body |
+
+Create accepts required `title` (trimmed, nonempty, at most 150 characters) and `description` (trimmed, nonempty), plus optional `project_url` and `is_seeking_collaborators`. URLs must use HTTP(S), contain no credentials, and fit within 512 characters; null clears the URL. The collaborator flag must be boolean and defaults to false; omitted URLs default to null. The existing 1 MB JSON body limit applies. Ownership comes from the token; IDs, ownership, timestamps, and other unsupported input fields are rejected.
+
+PATCH requires at least one supported field, preserves omitted fields, and refreshes `updated_at`. Responses contain the project record including ownership and timestamps. Validation errors return 400, invalid/missing authentication 401, another owner's project 403, and missing projects 404. Project mutations share a limit of 60 requests per IP per 15 minutes.
+
+```sh
+curl -i -X POST http://localhost:5000/api/projects \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"My first project","description":"A creative experiment"}'
+
+curl -X PATCH http://localhost:5000/api/projects/1 \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"is_seeking_collaborators":true,"project_url":"https://example.com"}'
+```
+
+Use the ID returned by creation in place of `1`. Deleting a project cascades to its media, tag/skill assignments, likes, saves, comments (including replies), and project-linked collaboration requests. Shared tag/skill catalog entries and unrelated projects remain. Media management, tag/skill assignment, and uploads are separate features.
+
+
+## Comment API
+
+Comments and replies are publicly readable. Creation requires a Bearer token; only a comment's author can edit or delete it. Project ownership does not grant comment moderation permissions.
+
+All routes use `/api/projects/:projectId/comments` as their base path:
+
+| Method | Suffix | Result |
+| --- | --- | --- |
+| POST | `/` | 201 with `{ comment }` and a Location header |
+| GET | `/?limit=20&offset=0` | `{ comments, pagination: { limit, offset } }` |
+| GET | `/:commentId` | `{ comment }` |
+| PATCH | `/:commentId` | Content update returning `{ comment }` |
+| DELETE | `/:commentId` | 204 without a body |
+
+Create accepts required `content` and optional `parent_comment_id`. Content is trimmed and must be nonempty text; the 1 MB JSON request limit applies. Omitted or null parents create top-level comments. A parent must be a positive integer ID of an existing comment in the same project. Nested replies are supported. PATCH accepts only `content`, updates `updated_at`, and preserves `created_at`. IDs, ownership, project assignment, parent changes, timestamps, and other unsupported fields are rejected as input.
+
+Responses include `id`, `user_id`, `project_id`, `parent_comment_id`, `content`, `created_at`, and `updated_at`. Lists include all comments and replies as a flat array ordered by ascending ID; clients can reconstruct threads using parent IDs. Pagination defaults to limit 20 and offset 0; maximum limit is 100.
+
+Invalid inputs or cross-project parents return 400, missing/invalid authentication 401, another author's mutation 403, and missing projects/comments/parents 404. A comment requested through another project's URL returns 404. Comment mutations share a limit of 60 requests per IP per 15 minutes; reads are not subject to this mutation limiter.
+
+```sh
+curl -i -X POST http://localhost:5000/api/projects/1/comments \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"content":"Great project!"}'
+
+curl -X POST http://localhost:5000/api/projects/1/comments \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"content":"Thank you!","parent_comment_id":1}'
+
+curl -X PATCH http://localhost:5000/api/projects/1/comments/1 \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"content":"Updated comment"}'
+```
+
+Replace example project/comment IDs with actual IDs. Deleting a comment permanently deletes all descendant replies, including replies written by other users. Deleting a project removes its comments; deleting an account removes its authored comments and their descendant replies. Unrelated comments remain. No schema migration is required for this API.

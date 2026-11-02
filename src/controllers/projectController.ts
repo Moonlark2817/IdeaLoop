@@ -2,177 +2,54 @@ import type { RequestHandler } from 'express';
 import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
 import { HttpError } from '../middleware/httpError.js';
-import * as validate from './projectValidation.js';
-
-const projectFields = [
-  'id',
-  'user_id',
-  'title',
-  'description',
-  'project_url',
-  'is_seeking_collaborators',
-  'created_at',
-  'updated_at',
-] as const;
+import { pagination } from './userValidation.js';
+import { projectId, projectInput } from './projectValidation.js';
 
 export function createProjectController(db: Kysely<Database>) {
-  const list: RequestHandler = async (_req, res) => {
-    const projects = await db
-      .selectFrom('projects')
-      .select(projectFields)
-      .orderBy('created_at', 'desc')
-      .execute();
-
-    res.json({ projects });
-  };
-
-  const get: RequestHandler = async (req, res) => {
-    const id = validate.projectId(req.params.id);
-
-    const project = await db
-      .selectFrom('projects')
-      .select(projectFields)
-      .where('id', '=', id)
-      .executeTakeFirst();
-
-    if (!project) {
-      throw new HttpError(404, 'Project not found');
-    }
-
-    res.json({ project });
-  };
-
+  async function find(id: number) {
+    const project = await db.selectFrom('projects').selectAll().where('id', '=', id).executeTakeFirst();
+    if (!project) throw new HttpError(404, 'Project not found');
+    return project;
+  }
+  async function assertOwner(id: number, userId: number) {
+    const project = await find(id);
+    if (project.user_id !== userId) throw new HttpError(403, 'You can only modify your own projects');
+  }
   const create: RequestHandler = async (req, res) => {
-    const body = validate.objectBody(req.body, [
-      'title',
-      'description',
-      'project_url',
-      'is_seeking_collaborators',
-    ]);
-
-    const input = {
+    const input = projectInput(req.body);
+    const project = await db.insertInto('projects').values({
+      ...input, title: input.title!, description: input.description!,
+      project_url: input.project_url ?? null, is_seeking_collaborators: input.is_seeking_collaborators ?? false,
       user_id: res.locals.userId as number,
-      title: validate.title(body.title),
-      description: validate.description(body.description),
-      project_url:
-        body.project_url === undefined
-          ? null
-          : validate.projectUrl(body.project_url),
-      is_seeking_collaborators:
-        body.is_seeking_collaborators === undefined
-          ? false
-          : validate.seekingCollaborators(body.is_seeking_collaborators),
-    };
-
-    const project = await db
-      .insertInto('projects')
-      .values(input)
-      .returning(projectFields)
-      .executeTakeFirstOrThrow();
-
-    res
-      .status(201)
-      .location(`/api/projects/${project.id}`)
-      .json({ project });
+    }).returningAll().executeTakeFirstOrThrow();
+    res.status(201).location(`/api/projects/${project.id}`).json({ project });
   };
-
+  const list: RequestHandler = async (req, res) => {
+    const limit = pagination(req.query.limit, 20, 100);
+    const offset = pagination(req.query.offset, 0, 2147483647);
+    const projects = await db.selectFrom('projects').selectAll().orderBy('id').limit(limit).offset(offset).execute();
+    res.json({ projects, pagination: { limit, offset } });
+  };
+  const get: RequestHandler = async (req, res) => {
+    res.json({ project: await find(projectId(req.params.id)) });
+  };
   const update: RequestHandler = async (req, res) => {
-    const id = validate.projectId(req.params.id);
+    const id = projectId(req.params.id);
     const userId = res.locals.userId as number;
-
-    const existing = await db
-      .selectFrom('projects')
-      .select(['id', 'user_id'])
-      .where('id', '=', id)
-      .executeTakeFirst();
-
-    if (!existing) {
-      throw new HttpError(404, 'Project not found');
-    }
-
-    if (existing.user_id !== userId) {
-      throw new HttpError(403, 'You can only edit your own projects');
-    }
-
-    const body = validate.objectBody(req.body, [
-      'title',
-      'description',
-      'project_url',
-      'is_seeking_collaborators',
-    ]);
-
-    const updates: {
-      title?: string;
-      description?: string;
-      project_url?: string | null;
-      is_seeking_collaborators?: boolean;
-      updated_at?: Date;
-    } = {};
-
-    if (body.title !== undefined) {
-      updates.title = validate.title(body.title);
-    }
-
-    if (body.description !== undefined) {
-      updates.description = validate.description(body.description);
-    }
-
-    if (body.project_url !== undefined) {
-      updates.project_url = validate.projectUrl(body.project_url);
-    }
-
-    if (body.is_seeking_collaborators !== undefined) {
-      updates.is_seeking_collaborators =
-        validate.seekingCollaborators(body.is_seeking_collaborators);
-    }
-
-    if (Object.keys(updates).length === 0) {
-      throw new HttpError(400, 'Provide at least one field to update');
-    }
-
-    updates.updated_at = new Date();
-
-    const project = await db
-      .updateTable('projects')
-      .set(updates)
-      .where('id', '=', id)
-      .where('user_id', '=', userId)
-      .returning(projectFields)
-      .executeTakeFirst();
-
-    if (!project) {
-      throw new HttpError(404, 'Project not found');
-    }
-
+    await assertOwner(id, userId);
+    const input = projectInput(req.body, true);
+    const project = await db.updateTable('projects').set({ ...input, updated_at: new Date() })
+      .where('id', '=', id).where('user_id', '=', userId).returningAll().executeTakeFirst();
+    if (!project) throw new HttpError(404, 'Project not found');
     res.json({ project });
   };
-
   const remove: RequestHandler = async (req, res) => {
-    const id = validate.projectId(req.params.id);
+    const id = projectId(req.params.id);
     const userId = res.locals.userId as number;
-
-    const existing = await db
-      .selectFrom('projects')
-      .select(['id', 'user_id'])
-      .where('id', '=', id)
-      .executeTakeFirst();
-
-    if (!existing) {
-      throw new HttpError(404, 'Project not found');
-    }
-
-    if (existing.user_id !== userId) {
-      throw new HttpError(403, 'You can only delete your own projects');
-    }
-
-    await db
-      .deleteFrom('projects')
-      .where('id', '=', id)
-      .where('user_id', '=', userId)
-      .execute();
-
+    await assertOwner(id, userId);
+    const result = await db.deleteFrom('projects').where('id', '=', id).where('user_id', '=', userId).executeTakeFirst();
+    if (result.numDeletedRows === 0n) throw new HttpError(404, 'Project not found');
     res.status(204).end();
   };
-
-  return { list, get, create, update, remove };
+  return { create, list, get, update, remove };
 }

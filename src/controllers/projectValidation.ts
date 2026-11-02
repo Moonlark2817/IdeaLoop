@@ -1,79 +1,47 @@
 import { HttpError } from '../middleware/httpError.js';
-
-export function objectBody(body: unknown, allowed: string[]): Record<string, unknown> {
-  if (!body || typeof body !== 'object' || Array.isArray(body)) {
-    throw new HttpError(400, 'A JSON object body is required');
-  }
-
-  const value = body as Record<string, unknown>;
-
-  if (Object.keys(value).some(key => !allowed.includes(key))) {
-    throw new HttpError(400, 'Request contains unsupported fields');
-  }
-
-  return value;
-}
+import { objectBody } from './userValidation.js';
 
 export function projectId(value: unknown): number {
-  if (
-    typeof value !== 'string' ||
-    !/^[1-9]\d*$/.test(value) ||
-    Number(value) > 2147483647
-  ) {
+  if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value) || Number(value) > 2147483647) {
     throw new HttpError(400, 'Project ID must be a positive integer');
   }
-
   return Number(value);
 }
 
-export function title(value: unknown): string {
-  if (typeof value !== 'string' || !value.trim() || value.trim().length > 150) {
-    throw new HttpError(400, 'Project title must contain 1–150 characters');
-  }
-
-  return value.trim();
-}
-
-export function description(value: unknown): string {
-  if (
-    typeof value !== 'string' ||
-    !value.trim() ||
-    value.trim().length > 10000
-  ) {
-    throw new HttpError(400, 'Project description must contain 1–10,000 characters');
-  }
-
-  return value.trim();
-}
-
-export function projectUrl(value: unknown): string | null {
-  if (value === null || value === '') return null;
-
-  if (typeof value !== 'string' || value.length > 512) {
-    throw new HttpError(400, 'Project URL must be at most 512 characters or null');
-  }
-
-  try {
-    const url = new URL(value);
-
-    if (
-      !['http:', 'https:'].includes(url.protocol) ||
-      url.username ||
-      url.password
-    ) {
-      throw new Error();
+export function projectInput(body: unknown, partial = false) {
+  const value = objectBody(body, ['title', 'description', 'project_url', 'is_seeking_collaborators']);
+  const input: {
+    title?: string; description?: string; project_url?: string | null;
+    is_seeking_collaborators?: boolean;
+  } = {};
+  for (const field of ['title', 'description'] as const) {
+    if (!partial || value[field] !== undefined) {
+      const text = value[field];
+      if (typeof text !== 'string' || !text.trim() || (field === 'title' && text.trim().length > 150)) {
+        throw new HttpError(400, `${field} must be nonempty text${field === 'title' ? ' of at most 150 characters' : ''}`);
+      }
+      input[field] = text.trim();
     }
-  } catch {
-    throw new HttpError(400, 'Project URL must be a valid HTTP(S) URL');
   }
-
-  return value;
-}
-
-export function seekingCollaborators(value: unknown): boolean {
-  if (typeof value !== 'boolean') {
-    throw new HttpError(400, 'is_seeking_collaborators must be true or false');
+  if (value.project_url !== undefined) {
+    const url = value.project_url;
+    if (url !== null) {
+      try {
+        if (typeof url !== 'string' || url.length > 512) throw new Error();
+        const parsed = new URL(url);
+        if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) throw new Error();
+      } catch {
+        throw new HttpError(400, 'project_url must be an HTTP(S) URL without credentials, at most 512 characters, or null');
+      }
+    }
+    input.project_url = url as string | null;
   }
-
-  return value;
+  if (value.is_seeking_collaborators !== undefined) {
+    if (typeof value.is_seeking_collaborators !== 'boolean') {
+      throw new HttpError(400, 'is_seeking_collaborators must be true or false');
+    }
+    input.is_seeking_collaborators = value.is_seeking_collaborators;
+  }
+  if (partial && Object.keys(input).length === 0) throw new HttpError(400, 'Provide at least one field to update');
+  return input;
 }
