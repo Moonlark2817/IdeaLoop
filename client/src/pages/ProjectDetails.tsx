@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { deleteProject, getProject, safeUrl } from "../api";
+import Comments from '../components/Comments';
 import { useAuth } from '../auth';
 import type { Project } from "../types";
 
@@ -118,6 +119,7 @@ export default function ProjectDetails() {
           </button>
         </div>}
       </article>
+      <Comments key={id} project={id!} />
     </main>
   );
 }

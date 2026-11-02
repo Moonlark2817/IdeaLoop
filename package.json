@@ -14,7 +14,8 @@
     "client:dev": "npm run dev --prefix client",
     "client:typecheck": "npm run typecheck --prefix client",
     "client:test": "npm test --prefix client",
-    "client:build": "npm run build --prefix client"
+    "client:build": "npm run build --prefix client",
+    "client:e2e": "npm run e2e --prefix client"
   },
   "repository": {
     "type": "git",

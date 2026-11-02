@@ -225,7 +225,26 @@ Protected navigation returns to the intended page after login.
 Commands: `npm run client:typecheck`, `npm run client:test`, and
 `npm run client:build`. Existing root commands continue to run the backend.
 
-Project browsing includes pagination, loading/error/empty states, and retry.
-Only project owners see edit/delete controls, and editing another user's project
-is blocked. Forms follow backend title and URL limits and retain input after
-recoverable errors. Deletion confirmation explains its cascading effects.
+The frontend includes public project browsing with pagination, owner-only project
+forms/deletion, and threaded comments with posting, replies, editing, and deletion.
+Deleting a project or parent comment asks for confirmation and explains cascading
+deletion. When a reply's parent is outside the loaded comment range, its context
+can be fetched separately. API failures preserve drafts and show actionable errors.
+
+Use Node.js 22.12+ for the frontend tooling. For browser acceptance tests, first run
+`npm exec --prefix client -- playwright install chromium`, then `npm run client:e2e`.
+The Playwright configuration starts the real Express app on port 5001 with a fresh,
+in-memory PGlite database and Vite on port 5174. No PostgreSQL service, `.env`, or
+production database credentials are used. Both ports must be free. The harness is
+separate from normal server startup and is never used by `npm start`.
+
+Frontend unit/component tests use Vitest, Testing Library, and mocked HTTP responses.
+Browser tests cover authentication, project CRUD, comment threads, permissions,
+confirmation cancellation, session expiry, direct routes, mobile navigation, and
+server failures. Browser artifacts are ignored by Git.
+
+`npm run client:build` writes `client/dist/`. Production hosting must serve those
+assets and route `/api` to the Express backend on the same origin. Route other
+non-asset URLs to `client/dist/index.html` for browser-router deep links; do not
+route unknown API requests to the SPA. The Vite proxy is development-only. Hosting
+and deployment are intentionally not configured by this change.
