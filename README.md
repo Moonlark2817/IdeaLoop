@@ -72,7 +72,7 @@ src/
   tests/                     Configuration, HTTP, and database integration tests
 ```
 
-User CRUD and basic registration/login are implemented. Project/comment/request endpoints, uploads, password recovery, email verification, and the React frontend remain future work. Cross-origin frontend access is not configured yet; configure the allowed frontend origin when the client is introduced.
+User CRUD and basic registration/login are implemented. Comment/request endpoints, uploads, password recovery, email verification, and the React frontend remain future work. Cross-origin frontend access is not configured yet; configure the allowed frontend origin when the client is introduced.
 
 ## Database
 
@@ -131,3 +131,34 @@ Registration and login share an in-memory limit of 20 requests per IP per 15 min
 Migration `005_user_identity` adds case-insensitive unique indexes without rewriting existing migrations. Existing databases with case-only duplicate usernames or emails must resolve those duplicates before applying it. The raw SQL alternative includes equivalent indexes in `db/modules/05_user_identity.sql`.
 
 Tests run the real migrations and Kysely queries against in-memory PostgreSQL using PGlite. Coverage includes user CRUD, input validation, privacy, authentication, owner-only mutations, password-change token invalidation, duplicate/racing registrations, rate limits, cascading deletes, and the new migration's rollback. No external database is required for tests.
+
+
+## Project API
+
+Project reads are public. Creation requires a Bearer token; updates and deletion require the project owner.
+
+| Method | Endpoint | Result |
+| --- | --- | --- |
+| POST | `/api/projects` | 201 with `{ project }` and a Location header |
+| GET | `/api/projects?limit=20&offset=0` | `{ projects, pagination: { limit, offset } }`, ordered by ascending ID; maximum limit 100 |
+| GET | `/api/projects/:id` | `{ project }` |
+| PATCH | `/api/projects/:id` | Partial update returning `{ project }` |
+| DELETE | `/api/projects/:id` | 204 without a body |
+
+Create accepts required `title` (trimmed, nonempty, at most 150 characters) and `description` (trimmed, nonempty), plus optional `project_url` and `is_seeking_collaborators`. URLs must use HTTP(S), contain no credentials, and fit within 512 characters; null clears the URL. The collaborator flag must be boolean and defaults to false; omitted URLs default to null. The existing 1 MB JSON body limit applies. Ownership comes from the token; IDs, ownership, timestamps, and other unsupported input fields are rejected.
+
+PATCH requires at least one supported field, preserves omitted fields, and refreshes `updated_at`. Responses contain the project record including ownership and timestamps. Validation errors return 400, invalid/missing authentication 401, another owner's project 403, and missing projects 404. Project mutations share a limit of 60 requests per IP per 15 minutes.
+
+```sh
+curl -i -X POST http://localhost:5000/api/projects \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"My first project","description":"A creative experiment"}'
+
+curl -X PATCH http://localhost:5000/api/projects/1 \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"is_seeking_collaborators":true,"project_url":"https://example.com"}'
+```
+
+Use the ID returned by creation in place of `1`. Deleting a project cascades to its media, tag/skill assignments, likes, saves, comments (including replies), and project-linked collaboration requests. Shared tag/skill catalog entries and unrelated projects remain. Media management, tag/skill assignment, uploads, and comment CRUD are separate features.
