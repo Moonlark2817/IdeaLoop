@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { register } from "../auth";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { request } from "../api";
+import { useAuth } from "../auth";
+import type { User } from "../types";
+import { safeRedirect } from "./Login";
 
 const USERNAME_PATTERN = /^[A-Za-z0-9_]{3,50}$/;
 const PASSWORD_MIN = 12;
@@ -9,6 +12,8 @@ const BIO_MAX = 2000;
 
 export default function Signup() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const auth = useAuth();
 
   const [form, setForm] = useState({
     username: "",
@@ -56,13 +61,17 @@ export default function Signup() {
     setSubmitting(true);
 
     try {
-      await register({
-        username: form.username,
-        email: form.email.trim(),
-        password: form.password,
-        ...(form.bio.trim() ? { bio: form.bio.trim() } : {})
+      const result = await request<{ user: User; token: string }>("/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          username: form.username,
+          email: form.email.trim(),
+          password: form.password,
+          ...(form.bio.trim() ? { bio: form.bio.trim() } : {})
+        })
       });
-      navigate("/projects");
+      auth.accept(result.user, result.token);
+      navigate(safeRedirect(location.state?.from), { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign up.");
     } finally {
@@ -154,7 +163,7 @@ export default function Signup() {
       </form>
 
       <p>
-        Already have an account? <Link to="/login">Log in</Link>
+        Already have an account? <Link to="/login" state={location.state}>Log in</Link>
       </p>
     </main>
   );

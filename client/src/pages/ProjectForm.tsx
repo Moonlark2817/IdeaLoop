@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { createProject, getProject, updateProject } from "../api";
+import { createProject, getProject, updateProject, safeUrl } from "../api";
+import { useAuth } from '../auth';
 import type { ProjectInput } from "../types";
 
 export default function ProjectForm() {
@@ -9,6 +10,8 @@ export default function ProjectForm() {
   const navigate = useNavigate();
 
   const editing = Boolean(id);
+  const { user } = useAuth();
+  const [canEdit, setCanEdit] = useState(!id);
 
   const [form, setForm] = useState<ProjectInput>({
     title: "",
@@ -23,28 +26,15 @@ export default function ProjectForm() {
 
   useEffect(() => {
     if (!id) return;
-
-    async function loadProject() {
-      try {
-        const project = await getProject(id!);
-
-        setForm({
-          title: project.title,
-          description: project.description,
-          project_url: project.project_url || "",
-          is_seeking_collaborators: project.is_seeking_collaborators
-        });
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Unable to load project."
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadProject();
-  }, [id]);
+    const controller = new AbortController();
+    setLoading(true); setError(''); setCanEdit(false);
+    getProject(id, controller.signal).then(project => {
+      if (project.user_id !== user?.id) throw new Error('You can only edit your own projects.');
+      setCanEdit(true);
+      setForm({title: project.title, description: project.description, project_url: project.project_url || '', is_seeking_collaborators: project.is_seeking_collaborators});
+    }).catch(err => {if (err.name !== 'AbortError') setError(err.message);}).finally(() => {if (!controller.signal.aborted) setLoading(false);});
+    return () => controller.abort();
+  }, [id, user?.id]);
 
   function handleChange(
     event: React.ChangeEvent<
@@ -72,6 +62,7 @@ export default function ProjectForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving || !canEdit) return;
     setError("");
 
     const title = form.title.trim();
@@ -83,27 +74,13 @@ export default function ProjectForm() {
         return;
     }
 
-    if (title.length > 255) {
-        setError("Project titles cannot exceed 255 characters.");
+    if (title.length > 150) {
+        setError("Project titles cannot exceed 150 characters.");
         return;
     }
 
-    if (description.length > 10000) {
-        setError("Project descriptions cannot exceed 10,000 characters.");
-        return;
-    }
-
-    if (projectUrl) {
-        try {
-            const url = new URL(projectUrl);
-
-            if (url.protocol !== "http:" && url.protocol !== "https:") {
-                throw new Error();
-            }
-        } catch {
-            setError("Please enter a valid HTTP or HTTPS project URL.");
-            return;
-        }
+    if (projectUrl && !safeUrl(projectUrl)) {
+      setError('Use an HTTP(S) URL without credentials, at most 512 characters.'); return;
     }
 
   try {
@@ -135,6 +112,7 @@ export default function ProjectForm() {
     return <main className="page-container">Loading project...</main>;
   }
 
+  if (!canEdit) return <main className="page-container"><p role="alert" className="error-message">{error || 'Project unavailable.'}</p><Link to="/projects">Back to projects</Link></main>;
   return (
     <main className="page-container form-page">
       <Link to="/projects" className="back-link">
@@ -154,7 +132,7 @@ export default function ProjectForm() {
             : "Tell the community what you are working on."}
         </p>
 
-        {error && <p className="error-message">{error}</p>}
+        {error && <p role="alert" className="error-message">{error}</p>}
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
@@ -167,7 +145,7 @@ export default function ProjectForm() {
               placeholder="Enter your project title"
               value={form.title}
               onChange={handleChange}
-              maxLength={255}
+              maxLength={150}
               required
             />
           </div>
@@ -182,12 +160,11 @@ export default function ProjectForm() {
               value={form.description}
               onChange={handleChange}
               rows={7}
-              maxLength={10000}
               required
             />
 
             <span className="character-count">
-              {form.description.length}/10,000 characters
+              {form.description.length} characters
             </span>
           </div>
 
@@ -198,6 +175,7 @@ export default function ProjectForm() {
               id="project_url"
               name="project_url"
               type="url"
+              maxLength={512}
               placeholder="https://example.com"
               value={form.project_url || ""}
               onChange={handleChange}

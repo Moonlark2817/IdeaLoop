@@ -432,3 +432,22 @@ textarea {
     display: none;
   }
 }
+:focus-visible { outline: 3px solid #286f91; outline-offset: 3px; }
+.skip-link { position: absolute; left: 10px; top: -80px; padding: 12px; background: white; z-index: 10; }
+.skip-link:focus { top: 10px; }
+.navbar, .nav-links { flex-wrap: wrap; gap: 15px; }
+button { cursor: pointer; }
+button:disabled { opacity: .55; cursor: not-allowed; }
+.project-card, .details-card, .comment { overflow-wrap: anywhere; }
+@media (max-width: 600px) { .feed-header { align-items: flex-start; gap: 15px; flex-direction: column; } }
+.comment-list { list-style: none; padding-left: 18px; border-left: 2px solid #dfe3e9; }
+.comment-list.deep-replies { padding-left: 0; border-left: none; }
+.comment { margin: 18px 0; }
+.comment article { background: white; padding: 18px; border: 1px solid #e7e9ee; border-radius: 10px; }
+.comment-content { white-space: pre-wrap; line-height: 1.6; }
+.comment-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.comment-editor { margin: 20px 0; }
+.comment-editor label { display: block; font-weight: 600; }
+.comment-editor textarea { margin: 10px 0; }
+.comment-editor button { margin-right: 12px; }
+@media (max-width: 600px) { .comment-list { padding-left: 8px; } }

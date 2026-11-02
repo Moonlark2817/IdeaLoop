@@ -1,9 +1,12 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { login } from "../auth";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { login } from "../api";
+import { useAuth } from "../auth";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const auth = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,8 +19,9 @@ export default function Login() {
     setSubmitting(true);
 
     try {
-      await login(email.trim(), password);
-      navigate("/projects");
+      const result = await login(email.trim(), password);
+      auth.accept(result.user, result.token);
+      navigate(safeRedirect(location.state?.from), { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to log in.");
     } finally {
@@ -56,7 +60,9 @@ export default function Login() {
           />
         </div>
 
-        {error && <p role="alert">{error}</p>}
+        {auth.message && <p role="status">{auth.message}</p>}
+
+      {error && <p role="alert">{error}</p>}
 
         <button type="submit" disabled={submitting}>
           {submitting ? "Logging in..." : "Log in"}
@@ -64,8 +70,14 @@ export default function Login() {
       </form>
 
       <p>
-        Don't have an account? <Link to="/signup">Sign up</Link>
+        Don't have an account? <Link to="/signup" state={location.state}>Sign up</Link>
       </p>
     </main>
   );
+}
+
+export function safeRedirect(from: unknown): string {
+  return typeof from === "string" && from.startsWith("/") && !from.startsWith("//")
+    ? from
+    : "/projects";
 }
