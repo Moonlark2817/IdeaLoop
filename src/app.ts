@@ -2,6 +2,7 @@ import express from 'express';
 import type { Kysely } from 'kysely';
 import type { Database } from './db/types.js';
 import { createUserRoutes } from './routes/userRoutes.js';
+import { createCommentRoutes } from './routes/commentRoutes.js';
 import { createProjectRoutes } from './routes/projectRoutes.js';
 import { createErrorHandler, notFound } from './middleware/errorHandler.js';
 
@@ -34,6 +35,7 @@ export function createApp({ checkDatabase, production = false, users }: AppOptio
     const routes = createUserRoutes(users.db, users.jwtSecret);
     app.use('/api/users', routes.users);
     app.use('/api/auth', routes.auth);
+    app.use('/api/projects/:projectId/comments', createCommentRoutes(users.db, users.jwtSecret));
     app.use('/api/projects', createProjectRoutes(users.db, users.jwtSecret));
   }
 
