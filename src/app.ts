@@ -17,7 +17,6 @@ export function createApp({ checkDatabase, production = false, users }: AppOptio
   app.disable('x-powered-by');
   app.use(express.json({ limit: '1mb' }));
 
-  // Liveness is independent of database availability.
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok' });
   });

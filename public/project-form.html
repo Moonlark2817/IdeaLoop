@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Project | IdeaLoop</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="js/projects.js" defer></script>
+    <script src="js/project-form.js" defer></script>
+</head>
+<body>
+
+    <header class="navbar">
+        <a href="projects.html" class="logo">IdeaLoop</a>
+
+        <nav class="nav-links">
+            <a href="projects.html">Explore Projects</a>
+            <a href="project-form.html">Create Project</a>
+        </nav>
+    </header>
+
+    <main class="container">
+
+        <section class="form-card">
+
+            <h1 id="form-heading">Create a Project</h1>
+
+            <p class="subtitle">
+                Share your idea and find people interested in collaborating.
+            </p>
+
+            <br>
+
+            <p id="form-error" class="error-message" role="alert"></p>
+
+            <form id="project-form">
+
+                <div class="form-group">
+                    <label for="title">Project Title *</label>
+                    <input
+                        type="text"
+                        id="title"
+                        name="title"
+                        placeholder="Enter your project title"
+                        maxlength="150"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Project Description *</label>
+                    <textarea
+                        id="description"
+                        name="description"
+                        placeholder="Describe your project, its purpose, and what you hope to accomplish..."
+                        required
+                    ></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="tags">Skills and Technologies</label>
+                    <input
+                        type="text"
+                        id="tags"
+                        name="tags"
+                        placeholder="JavaScript, Python, HTML, CSS"
+                    >
+                    <p class="form-help">
+                        Separate each skill or technology with a comma.
+                    </p>
+                </div>
+
+                <div class="form-group">
+                    <label for="project-url">Project URL</label>
+                    <input
+                        type="url"
+                        id="project-url"
+                        name="project-url"
+                        placeholder="https://github.com/your-project"
+                    >
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <input
+                        type="checkbox"
+                        id="seeking-collaborators"
+                        name="seeking-collaborators"
+                        checked
+                    >
+
+                    <label for="seeking-collaborators">
+                        I am looking for collaborators
+                    </label>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="button">
+                        Save Project
+                    </button>
+
+                    <a href="projects.html"
+                       class="button button-secondary">
+                        Cancel
+                    </a>
+                </div>
+
+            </form>
+
+        </section>
+
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 IdeaLoop. Connect. Create. Collaborate.</p>
+    </footer>
+
+</body>
+</html>

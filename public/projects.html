@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Feed | IdeaLoop</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="js/projects.js" defer></script>
+</head>
+<body>
+
+    <header class="navbar">
+        <a href="projects.html" class="logo">IdeaLoop</a>
+
+        <nav class="nav-links">
+            <a href="projects.html">Explore Projects</a>
+            <a href="project-form.html">Create Project</a>
+        </nav>
+    </header>
+
+    <main class="container">
+
+        <section class="page-header">
+            <div>
+                <h1>Explore Projects</h1>
+                <p class="subtitle">
+                    Discover ideas, connect with students, and collaborate.
+                </p>
+            </div>
+
+            <a href="project-form.html" class="button">
+                + Create Project
+            </a>
+        </section>
+
+        <section>
+            <input
+                type="search"
+                id="project-search"
+                class="search-bar"
+                placeholder="Search projects by name, description, or technology..."
+                aria-label="Search projects"
+            >
+        </section>
+
+        <section>
+            <div id="project-list" class="project-grid">
+                <!-- Projects are inserted here by projects.js -->
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 IdeaLoop. Connect. Create. Collaborate.</p>
+    </footer>
+
+</body>
+</html>
