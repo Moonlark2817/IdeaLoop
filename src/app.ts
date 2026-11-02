@@ -2,6 +2,7 @@ import express from 'express';
 import type { Kysely } from 'kysely';
 import type { Database } from './db/types.js';
 import { createUserRoutes } from './routes/userRoutes.js';
+import { createProjectRoutes } from './routes/projectRoutes.js';
 import { createErrorHandler, notFound } from './middleware/errorHandler.js';
 
 interface AppOptions {
@@ -15,7 +16,6 @@ export function createApp({ checkDatabase, production = false, users }: AppOptio
   app.disable('x-powered-by');
   app.use(express.json({ limit: '1mb' }));
 
-  // Liveness is independent of database availability.
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok' });
   });
@@ -30,10 +30,12 @@ export function createApp({ checkDatabase, production = false, users }: AppOptio
   });
 
   if (users) {
-    const routes = createUserRoutes(users.db, users.jwtSecret);
-    app.use('/api/users', routes.users);
-    app.use('/api/auth', routes.auth);
-  }
+  const routes = createUserRoutes(users.db, users.jwtSecret);
+
+  app.use('/api/users', routes.users);
+  app.use('/api/auth', routes.auth);
+  app.use('/api/projects', createProjectRoutes(users.db, users.jwtSecret));
+}
 
   app.use(notFound);
   app.use(createErrorHandler(production));
