@@ -335,6 +335,14 @@ the report focused on application logic; migrations and the CLI still execute in
 integration tests. Coverage is reported without a percentage gate in this iteration.
 High coverage does not replace the behavior assertions or prove live AWS behavior.
 
+The backend GitHub Actions workflow (`.github/workflows/backend.yml`) runs for PRs
+into `main` and pushes to `main` or `mokshil`. Its Node.js 22/24 matrix installs the
+root lockfile with `npm ci`, checks types, builds, and runs the coverage suite.
+Coverage artifacts are uploaded separately for each Node version and retained for
+14 days. Test failures fail the job even though artifact upload still runs. The
+workflow uses read-only repository permissions and requires no cloud/database
+secrets. Hosted workflow results become available after the workflow is pushed.
+
 A regression test exposed a skill-ID validation gap: values above PostgreSQL's
 integer range previously reached the database and returned 500. They now return
 400 before any replacement occurs, and existing assignments remain unchanged.

@@ -1,0 +1,46 @@
+name: Backend tests and coverage
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, mokshil]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend / Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    env:
+      S3_ENABLED: 'false'
+      AWS_EC2_METADATA_DISABLED: 'true'
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run test:coverage
+      - name: Upload backend coverage
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: backend-coverage-node-${{ matrix.node }}
+          path: coverage/
+          if-no-files-found: warn
+          retention-days: 14
