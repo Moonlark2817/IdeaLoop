@@ -1,10 +1,12 @@
 import 'dotenv/config';
+import { parseStorageEnvironment, type StorageConfiguration } from './storage.js';
 
 export interface Environment {
   nodeEnv: 'development' | 'test' | 'production';
   port: number;
   databaseUrl: string;
   jwtSecret?: string;
+  storage?: StorageConfiguration;
 }
 
 export function parseEnvironment(source: NodeJS.ProcessEnv): Environment {
@@ -35,5 +37,6 @@ export function parseEnvironment(source: NodeJS.ProcessEnv): Environment {
     throw new Error('JWT_SECRET must contain at least 32 characters and must not be a placeholder');
   }
 
-  return { ...(jwtSecret ? { jwtSecret } : {}), nodeEnv: nodeEnv as Environment['nodeEnv'], port, databaseUrl };
+  const storage = parseStorageEnvironment(source);
+  return { ...(storage ? {storage} : {}), ...(jwtSecret ? { jwtSecret } : {}), nodeEnv: nodeEnv as Environment['nodeEnv'], port, databaseUrl };
 }
