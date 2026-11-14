@@ -233,8 +233,13 @@ test('Project API integration tests', async (t) => {
       assert.equal((await discover({q: 'a'.repeat(200)})).status, 200);
     });
 
+    await t.test('discovery sorts by creation date with stable ties and null dates last', async () => {
+      assert.deepEqual(ids((await discover({sort: 'newest'})).body), [literal.id, gamma.id, beta.id, descriptionOnly.id, alpha.id, undated.id]);
+      assert.deepEqual(ids((await discover({sort: 'oldest'})).body), [alpha.id, descriptionOnly.id, beta.id, gamma.id, literal.id, undated.id]);
+      assert.deepEqual(ids((await discover()).body), fixtures.map(project => project.id));
+    });
     await t.test('rejects invalid discovery parameters', async () => {
-      for (const query of ["q=a&q=b", "q[]=a", "q[x]=a", "q=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "q=%00"]) {
+      for (const query of ["q=a&q=b", "q[]=a", "q[x]=a", "q=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "q=%00", "sort=popular", "sort=", "sort=newest&sort=oldest", "sort[]=newest"]) {
         assert.equal((await request('GET', `/api/projects?${query}`)).status, 400, query);
       }
     });

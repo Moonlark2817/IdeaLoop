@@ -1,5 +1,5 @@
 import type { RequestHandler } from 'express';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
 import { HttpError } from '../middleware/httpError.js';
 import { pagination } from './userValidation.js';
@@ -36,7 +36,13 @@ export function createProjectController(db: Kysely<Database>) {
         eb('title', 'ilike', pattern), eb('description', 'ilike', pattern),
       ]));
     }
-    query = query.orderBy('id');
+    if (filters.sort === 'newest') {
+      query = query.orderBy(sql`created_at desc nulls last`).orderBy('id', 'desc');
+    } else if (filters.sort === 'oldest') {
+      query = query.orderBy(sql`created_at asc nulls last`).orderBy('id', 'asc');
+    } else {
+      query = query.orderBy('id');
+    }
     const projects = await query.limit(limit).offset(offset).execute();
     res.json({ projects, pagination: { limit, offset } });
   };

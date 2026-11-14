@@ -256,3 +256,7 @@ The public project feed searches project titles and descriptions on form submiss
 search (at most 200 characters). Percent signs, underscores, and backslashes are
 literal characters. Empty search text includes all projects. Malformed or repeated
 recognized query parameters return 400. Search changes reset pagination.
+
+Use `sort=newest` or `sort=oldest` to order by creation time and ID as a stable
+tie-breaker, with null creation times last. The UI defaults to newest-first;
+omitting sort preserves ascending-ID API ordering.

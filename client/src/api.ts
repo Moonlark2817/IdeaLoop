@@ -29,10 +29,12 @@ export const me = (signal?: AbortSignal) => request<{user: User}>('/users/me', {
 export interface ProjectDiscoveryOptions {
   offset?: number;
   q?: string;
+  sort?: 'newest' | 'oldest';
 }
-export function getProjects({offset = 0, q}: ProjectDiscoveryOptions = {}, signal?: AbortSignal) {
+export function getProjects({offset = 0, q, sort}: ProjectDiscoveryOptions = {}, signal?: AbortSignal) {
   const params = new URLSearchParams({limit: '20', offset: String(offset)});
   if (q?.trim()) params.set('q', q.trim());
+  if (sort) params.set('sort', sort);
   return request<{projects: Project[]; pagination: {limit: number; offset: number}}>(`/projects?${params}`, {signal});
 }
 export const getProject = async (id: string, signal?: AbortSignal) => (await request<{project: Project}>(`/projects/${id}`, { signal })).project;

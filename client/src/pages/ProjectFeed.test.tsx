@@ -16,3 +16,12 @@ test('submits title and description search explicitly and returns to the first p
   await waitFor(() => expect(new URL(String(fetcher.mock.calls[fetcher.mock.calls.length - 1][0]),'http://localhost').searchParams.get('q')).toBe('music & art'));
   expect(new URL(String(fetcher.mock.calls[fetcher.mock.calls.length - 1][0]),'http://localhost').searchParams.get('offset')).toBe('0');
 });
+test('changes project sorting without discarding search', async () => {
+  const fetcher = vi.spyOn(globalThis,'fetch').mockImplementation(async () => new Response(JSON.stringify({projects:[],pagination:{limit:20,offset:0}})));
+  render(<MemoryRouter><ProjectFeed /></MemoryRouter>);
+  expect(screen.getByLabelText('Sort projects')).toHaveValue('newest');
+  await userEvent.type(screen.getByLabelText('Search projects'),'art'); await userEvent.click(screen.getByRole('button',{name:'Search'}));
+  await userEvent.selectOptions(screen.getByLabelText('Sort projects'),'oldest');
+  await waitFor(() => expect(new URL(String(fetcher.mock.calls[fetcher.mock.calls.length - 1][0]),'http://localhost').searchParams.get('sort')).toBe('oldest'));
+  expect(new URL(String(fetcher.mock.calls[fetcher.mock.calls.length - 1][0]),'http://localhost').searchParams.get('q')).toBe('art');
+});
