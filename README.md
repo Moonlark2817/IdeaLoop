@@ -27,7 +27,7 @@ npm run db:migrate
 npm run dev
 ```
 
-The API listens on `PORT` (default `5000`). `DATABASE_URL` is required. `NODE_ENV` must be `development`, `test`, or `production`. The API requires `JWT_SECRET`; migrations do not require it. S3 placeholders are reserved for future uploads.
+The API listens on `PORT` (default `5000`). `DATABASE_URL` is required. `NODE_ENV` must be `development`, `test`, or `production`. The API requires `JWT_SECRET`; migrations do not require it. AWS S3 storage is optional and disabled by default; see [object storage setup](docs/object-storage.md).
 
 ## Commands
 
@@ -283,3 +283,19 @@ assets and route `/api` to the Express backend on the same origin. Route other
 non-asset URLs to `client/dist/index.html` for browser-router deep links; do not
 route unknown API requests to the SPA. The Vite proxy is development-only. Hosting
 and deployment are intentionally not configured by this change.
+
+
+## Object storage (#47)
+
+An optional backend AWS S3 foundation provides private object upload/deletion,
+short-lived signed read URLs, and a read-only bucket connectivity check. Enable it
+with `S3_ENABLED=true`, `AWS_REGION`, and `S3_BUCKET_NAME`; URL lifetime defaults to
+900 seconds through `S3_READ_URL_TTL_SECONDS` (1–3600). The SDK resolves credentials
+from your local AWS profile, environment, or deployment IAM role. Database-only
+work continues without AWS configuration when storage is disabled.
+
+See [bucket setup, IAM policy, configuration, and service usage](docs/object-storage.md).
+Once your bucket and credentials are configured, `npm run storage:check` verifies
+bucket access without writing or deleting objects. Live AWS access has not been
+verified by automated tests. Project upload endpoints and frontend image controls
+remain the separate image-upload task (#46); no database migration is introduced.
