@@ -3,7 +3,7 @@ import type { Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
 import { HttpError } from '../middleware/httpError.js';
 import { pagination } from './userValidation.js';
-import { projectId, projectInput } from './projectValidation.js';
+import { projectId, projectInput, projectDiscovery } from './projectValidation.js';
 
 export function createProjectController(db: Kysely<Database>) {
   async function find(id: number) {
@@ -27,7 +27,17 @@ export function createProjectController(db: Kysely<Database>) {
   const list: RequestHandler = async (req, res) => {
     const limit = pagination(req.query.limit, 20, 100);
     const offset = pagination(req.query.offset, 0, 2147483647);
-    const projects = await db.selectFrom('projects').selectAll().orderBy('id').limit(limit).offset(offset).execute();
+    const filters = projectDiscovery(req.query);
+    let query = db.selectFrom('projects').selectAll();
+    if (filters.q) {
+      // Escape LIKE metacharacters so user text is a literal substring.
+      const pattern = `%${filters.q.replace(/[\\%_]/g, character => `\\${character}`)}%`;
+      query = query.where(eb => eb.or([
+        eb('title', 'ilike', pattern), eb('description', 'ilike', pattern),
+      ]));
+    }
+    query = query.orderBy('id');
+    const projects = await query.limit(limit).offset(offset).execute();
     res.json({ projects, pagination: { limit, offset } });
   };
   const get: RequestHandler = async (req, res) => {

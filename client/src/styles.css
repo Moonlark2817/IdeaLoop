@@ -451,3 +451,20 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .comment-editor textarea { margin: 10px 0; }
 .comment-editor button { margin-right: 12px; }
 @media (max-width: 600px) { .comment-list { padding-left: 8px; } }
+
+.discovery-controls { margin: 28px 0; padding: 24px; background: #fff; border: 1px solid #e7e9ee; border-radius: 13px; }
+.discovery-controls label { font-weight: 600; }
+.discovery-search > label, .discovery-filters > div > label { display: block; margin-bottom: 8px; }
+.search-actions { display: flex; gap: 12px; }
+.search-actions input { min-width: 0; }
+.discovery-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 24px; margin-top: 20px; }
+.discovery-filters select { display: block; font: inherit; color: inherit; background: #fff; border: 1px solid #dfe3e9; border-radius: 8px; padding: 10px; }
+.discovery-filters .checkbox-group { align-self: end; padding: 12px 0; }
+.discovery-filters > button { align-self: end; }
+@media (max-width: 600px) {
+  .discovery-controls { padding: 16px; }
+  .search-actions { flex-direction: column; }
+  .discovery-filters { align-items: stretch; flex-direction: column; gap: 14px; }
+  .discovery-filters select { width: 100%; }
+  .discovery-filters .checkbox-group, .discovery-filters > button { align-self: start; }
+}

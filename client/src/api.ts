@@ -26,7 +26,15 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
 export const login = (email: string, password: string) => request<{user: User; token: string}>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
 export const register = (username: string, email: string, password: string) => request<{user: User; token: string}>('/auth/register', { method: 'POST', body: JSON.stringify({ username, email, password }) });
 export const me = (signal?: AbortSignal) => request<{user: User}>('/users/me', { signal });
-export const getProjects = (offset = 0, signal?: AbortSignal) => request<{projects: Project[]; pagination: {limit: number; offset: number}}>(`/projects?limit=20&offset=${offset}`, { signal });
+export interface ProjectDiscoveryOptions {
+  offset?: number;
+  q?: string;
+}
+export function getProjects({offset = 0, q}: ProjectDiscoveryOptions = {}, signal?: AbortSignal) {
+  const params = new URLSearchParams({limit: '20', offset: String(offset)});
+  if (q?.trim()) params.set('q', q.trim());
+  return request<{projects: Project[]; pagination: {limit: number; offset: number}}>(`/projects?${params}`, {signal});
+}
 export const getProject = async (id: string, signal?: AbortSignal) => (await request<{project: Project}>(`/projects/${id}`, { signal })).project;
 export const createProject = async (data: ProjectInput) => (await request<{project: Project}>('/projects', { method: 'POST', body: JSON.stringify(data) })).project;
 export const updateProject = async (id: string, data: ProjectInput) => (await request<{project: Project}>(`/projects/${id}`, { method: 'PATCH', body: JSON.stringify(data) })).project;

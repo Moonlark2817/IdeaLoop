@@ -20,3 +20,11 @@ test('handles network errors, cancellation, and non-JSON errors', async () => {
 test('validates clickable external links', () => {
  expect(safeUrl('https://example.com')).toBe(true); for (const url of ['javascript:alert(1)', 'https://user:pass@example.com', 'invalid']) expect(safeUrl(url)).toBe(false);
 });
+
+ test('encodes project search as literal query text', async () => {
+  const {getProjects} = await import('./api');
+  const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({projects: [], pagination: {limit: 20, offset: 20}})));
+  await getProjects({q: ' art & music_% ', offset: 20});
+  const params = new URL(String(fetcher.mock.calls[0][0]), 'http://localhost').searchParams;
+  expect(params.get('q')).toBe('art & music_%'); expect(params.get('offset')).toBe('20');
+ });

@@ -45,3 +45,17 @@ export function projectInput(body: unknown, partial = false) {
   if (partial && Object.keys(input).length === 0) throw new HttpError(400, 'Provide at least one field to update');
   return input;
 }
+
+/** Optional discovery filters; pagination retains the shared API validation. */
+export function projectDiscovery(query: Record<string, unknown>) {
+  const fields = ['q', 'limit', 'offset'];
+  if (Object.keys(query).some(key => fields.some(field => key.startsWith(`${field}[`)))) {
+    throw new HttpError(400, 'Discovery parameters must be single values');
+  }
+  if (query.q !== undefined && (typeof query.q !== 'string' || query.q.trim().length > 200 || query.q.includes('\0'))) {
+    throw new HttpError(400, 'q must be text of at most 200 characters');
+  }
+  return {
+    q: typeof query.q === 'string' ? query.q.trim() : '',
+  };
+}

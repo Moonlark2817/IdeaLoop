@@ -248,3 +248,11 @@ assets and route `/api` to the Express backend on the same origin. Route other
 non-asset URLs to `client/dist/index.html` for browser-router deep links; do not
 route unknown API requests to the SPA. The Vite proxy is development-only. Hosting
 and deployment are intentionally not configured by this change.
+
+### Project discovery (#54)
+
+The public project feed searches project titles and descriptions on form submission.
+`GET /api/projects?q=art` performs a trimmed, case-insensitive literal substring
+search (at most 200 characters). Percent signs, underscores, and backslashes are
+literal characters. Empty search text includes all projects. Malformed or repeated
+recognized query parameters return 400. Search changes reset pagination.

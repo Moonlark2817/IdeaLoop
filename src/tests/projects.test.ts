@@ -206,6 +206,38 @@ test('Project API integration tests', async (t) => {
       const finalBody = await finalCreate.json() as any;
       assert.equal(finalCreate.headers.get('location'), `/api/projects/${finalBody.project.id}`);
     });
+    const fixtures = await db.insertInto('projects').values([
+      {user_id: aliceId, title: 'Discovery Alpha', description: 'A painting', project_url: null, is_seeking_collaborators: true, created_at: '2020-01-01'},
+      {user_id: bobId, title: 'Discovery Beta', description: 'NEEDLE in the description', project_url: null, is_seeking_collaborators: false, created_at: '2022-01-01'},
+      {user_id: aliceId, title: 'Discovery Gamma', description: 'needle for a team', project_url: null, is_seeking_collaborators: true, created_at: '2022-01-01'},
+      {user_id: bobId, title: 'Discovery Unknown date', description: 'No date', project_url: null, is_seeking_collaborators: false, created_at: null},
+      {user_id: bobId, title: 'Discovery literal 100% under_score path\\demo', description: 'Special characters', project_url: null, is_seeking_collaborators: false, created_at: '2023-01-01'},
+      {user_id: aliceId, title: 'Unrelated heading', description: 'Discovery in description only', project_url: null, is_seeking_collaborators: true, created_at: '2021-01-01'},
+    ]).returningAll().execute();
+    const [alpha, beta, gamma, undated, literal, descriptionOnly] = fixtures;
+    const ids = (body: any) => body.projects.map((project: any) => project.id);
+    const discover = (values: Record<string, string> = {}) => request('GET', `/api/projects?${new URLSearchParams({q: 'discovery', ...values})}`);
+
+    await t.test('discovery searches titles and descriptions with literal case-insensitive substrings', async () => {
+      const matching = await discover({q: '  dIsCoVeRy  '});
+      assert.equal(matching.status, 200);
+      assert.deepEqual(ids(matching.body), fixtures.map(project => project.id));
+      assert.deepEqual(ids((await discover({q: 'needle'})).body), [beta.id, gamma.id]);
+      assert.deepEqual(ids((await discover({q: 'description only'})).body), [descriptionOnly.id]);
+      for (const q of ['%', '_', '\\', '100%', 'under_score', 'path\\demo']) {
+        assert.deepEqual(ids((await discover({q})).body), [literal.id], q);
+      }
+      assert.deepEqual(ids((await discover({q: "' OR 1=1 --"})).body), []);
+      const all = await request('GET', '/api/projects');
+      assert.deepEqual((await discover({q: '   '})).body, all.body);
+      assert.equal((await discover({q: 'a'.repeat(200)})).status, 200);
+    });
+
+    await t.test('rejects invalid discovery parameters', async () => {
+      for (const query of ["q=a&q=b", "q[]=a", "q[x]=a", "q=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "q=%00"]) {
+        assert.equal((await request('GET', `/api/projects?${query}`)).status, 400, query);
+      }
+    });
   } finally {
     await new Promise<void>((resolve, reject) =>
       server.close((error) =>
