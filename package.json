@@ -15,7 +15,8 @@
     "client:typecheck": "npm run typecheck --prefix client",
     "client:test": "npm test --prefix client",
     "client:build": "npm run build --prefix client",
-    "client:e2e": "npm run e2e --prefix client"
+    "client:e2e": "npm run e2e --prefix client",
+    "storage:check": "tsx src/storage/check.ts"
   },
   "repository": {
     "type": "git",
