@@ -48,7 +48,7 @@ export function projectInput(body: unknown, partial = false) {
 
 /** Optional discovery filters; pagination retains the shared API validation. */
 export function projectDiscovery(query: Record<string, unknown>) {
-  const fields = ['q', 'sort', 'limit', 'offset'];
+  const fields = ['q', 'sort', 'seeking_collaborators', 'limit', 'offset'];
   if (Object.keys(query).some(key => fields.some(field => key.startsWith(`${field}[`)))) {
     throw new HttpError(400, 'Discovery parameters must be single values');
   }
@@ -58,8 +58,12 @@ export function projectDiscovery(query: Record<string, unknown>) {
   if (query.sort !== undefined && query.sort !== 'newest' && query.sort !== 'oldest') {
     throw new HttpError(400, 'sort must be newest or oldest');
   }
+  if (query.seeking_collaborators !== undefined && query.seeking_collaborators !== 'true' && query.seeking_collaborators !== 'false') {
+    throw new HttpError(400, 'seeking_collaborators must be true or false');
+  }
   return {
     q: typeof query.q === 'string' ? query.q.trim() : '',
     sort: query.sort as 'newest' | 'oldest' | undefined,
+    seekingCollaborators: query.seeking_collaborators === undefined ? undefined : query.seeking_collaborators === 'true',
   };
 }

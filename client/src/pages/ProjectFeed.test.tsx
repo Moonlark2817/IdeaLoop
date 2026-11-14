@@ -25,3 +25,11 @@ test('changes project sorting without discarding search', async () => {
   await waitFor(() => expect(new URL(String(fetcher.mock.calls[fetcher.mock.calls.length - 1][0]),'http://localhost').searchParams.get('sort')).toBe('oldest'));
   expect(new URL(String(fetcher.mock.calls[fetcher.mock.calls.length - 1][0]),'http://localhost').searchParams.get('q')).toBe('art');
 });
+test('applies collaborator-only filtering', async () => {
+  const fetcher = vi.spyOn(globalThis,'fetch').mockImplementation(async () => new Response(JSON.stringify({projects:[],pagination:{limit:20,offset:0}})));
+  render(<MemoryRouter><ProjectFeed /></MemoryRouter>);
+  await userEvent.click(screen.getByLabelText('Seeking collaborators only'));
+  await waitFor(() => expect(new URL(String(fetcher.mock.calls[fetcher.mock.calls.length - 1][0]),'http://localhost').searchParams.get('seeking_collaborators')).toBe('true'));
+  await userEvent.click(screen.getByLabelText('Seeking collaborators only'));
+  await waitFor(() => expect(new URL(String(fetcher.mock.calls[fetcher.mock.calls.length - 1][0]),'http://localhost').searchParams.get('seeking_collaborators')).toBeNull());
+});

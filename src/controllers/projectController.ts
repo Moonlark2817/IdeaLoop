@@ -36,6 +36,9 @@ export function createProjectController(db: Kysely<Database>) {
         eb('title', 'ilike', pattern), eb('description', 'ilike', pattern),
       ]));
     }
+    if (filters.seekingCollaborators !== undefined) {
+      query = query.where('is_seeking_collaborators', '=', filters.seekingCollaborators);
+    }
     if (filters.sort === 'newest') {
       query = query.orderBy(sql`created_at desc nulls last`).orderBy('id', 'desc');
     } else if (filters.sort === 'oldest') {

@@ -260,3 +260,7 @@ recognized query parameters return 400. Search changes reset pagination.
 Use `sort=newest` or `sort=oldest` to order by creation time and ID as a stable
 tie-breaker, with null creation times last. The UI defaults to newest-first;
 omitting sort preserves ascending-ID API ordering.
+
+Use `seeking_collaborators=true` or `false` to filter projects. Omit it to include
+both. The feed checkbox shows only projects seeking collaborators. Filters combine
+before pagination, and changing the checkbox returns to page one.
