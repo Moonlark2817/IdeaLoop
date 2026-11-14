@@ -37,7 +37,7 @@ export function getProjects({offset = 0, q, sort, seekingCollaborators}: Project
   if (q?.trim()) params.set('q', q.trim());
   if (sort) params.set('sort', sort);
   if (seekingCollaborators !== undefined) params.set('seeking_collaborators', String(seekingCollaborators));
-  return request<{projects: Project[]; pagination: {limit: number; offset: number}}>(`/projects?${params}`, {signal});
+  return request<{projects: Project[]; pagination: {limit: number; offset: number; has_more: boolean}}>(`/projects?${params}`, {signal});
 }
 export const getProject = async (id: string, signal?: AbortSignal) => (await request<{project: Project}>(`/projects/${id}`, { signal })).project;
 export const createProject = async (data: ProjectInput) => (await request<{project: Project}>('/projects', { method: 'POST', body: JSON.stringify(data) })).project;

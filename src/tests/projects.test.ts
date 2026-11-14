@@ -125,7 +125,7 @@ test('Project API integration tests', async (t) => {
 
     await t.test('core CRUD, validation, and cascades', async () => {
       const empty = await request('GET', '/api/projects');
-      assert.deepEqual(empty.body, { projects: [], pagination: { limit: 20, offset: 0 } });
+      assert.deepEqual(empty.body, { projects: [], pagination: { limit: 20, offset: 0, has_more: false } });
       const created = await request('POST', '/api/projects', { title: '  First  ', description: '  Description  ' }, aliceToken);
       assert.equal(created.status, 201);
       const project = created.body.project;
@@ -178,7 +178,7 @@ test('Project API integration tests', async (t) => {
       assert.equal(second.status, 201);
       const page = await request('GET', '/api/projects?limit=1&offset=1');
       assert.deepEqual(page.body.projects.map((p: any) => p.id), [second.body.project.id]);
-      assert.deepEqual(page.body.pagination, { limit: 1, offset: 1 });
+      assert.deepEqual(page.body.pagination, { limit: 1, offset: 1, has_more: false });
       assert.deepEqual((await request('GET', '/api/projects')).body.projects.map((p: any) => p.id), [project.id, second.body.project.id]);
       const tag = await db.insertInto('tags').values({ name: 'test' }).returning('id').executeTakeFirstOrThrow();
       const skill = await db.insertInto('skills').values({ name: 'test', category: 'Art' }).returning('id').executeTakeFirstOrThrow();
@@ -206,6 +206,7 @@ test('Project API integration tests', async (t) => {
       const finalBody = await finalCreate.json() as any;
       assert.equal(finalCreate.headers.get('location'), `/api/projects/${finalBody.project.id}`);
     });
+
     const fixtures = await db.insertInto('projects').values([
       {user_id: aliceId, title: 'Discovery Alpha', description: 'A painting', project_url: null, is_seeking_collaborators: true, created_at: '2020-01-01'},
       {user_id: bobId, title: 'Discovery Beta', description: 'NEEDLE in the description', project_url: null, is_seeking_collaborators: false, created_at: '2022-01-01'},
@@ -242,9 +243,29 @@ test('Project API integration tests', async (t) => {
       assert.deepEqual(ids((await discover({q: 'needle', seeking_collaborators: 'true', sort: 'oldest'})).body), [gamma.id]);
     });
 
-    await t.test('rejects invalid discovery parameters', async () => {
-      for (const query of ["q=a&q=b", "q[]=a", "q[x]=a", "q=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "q=%00", "sort=popular", "sort=", "sort=newest&sort=oldest", "sort[]=newest", "seeking_collaborators=1", "seeking_collaborators=True", "seeking_collaborators=", "seeking_collaborators=true&seeking_collaborators=false"]) {
-        assert.equal((await request('GET', `/api/projects?${query}`)).status, 400, query);
+    await t.test('discovery paginates matching results with exact has_more boundaries', async () => {
+      const first = await discover({seeking_collaborators: 'true', sort: 'newest', limit: '2'});
+      assert.deepEqual(ids(first.body), [gamma.id, descriptionOnly.id]);
+      assert.deepEqual(first.body.pagination, {limit: 2, offset: 0, has_more: true});
+      const last = await discover({seeking_collaborators: 'true', sort: 'newest', limit: '2', offset: '2'});
+      assert.deepEqual(ids(last.body), [alpha.id]);
+      assert.equal(last.body.pagination.has_more, false);
+      assert.equal((await discover({limit: '6'})).body.pagination.has_more, false);
+      assert.equal((await discover({limit: '5'})).body.pagination.has_more, true);
+      assert.equal((await discover({limit: '1', offset: '5'})).body.pagination.has_more, false);
+      assert.deepEqual((await discover({offset: '6'})).body, {projects: [], pagination: {limit: 20, offset: 6, has_more: false}});
+      assert.deepEqual((await discover({q: 'no-such-project'})).body, {projects: [], pagination: {limit: 20, offset: 0, has_more: false}});
+    });
+
+    await t.test('discovery rejects malformed and repeated recognized query values', async () => {
+      const invalid = ['sort=popular', 'sort=', 'sort=newest&sort=oldest', 'q=a&q=b', 'q[]=a', 'q[x]=a',
+        `q=${'a'.repeat(201)}`, 'q=%00', 'seeking_collaborators=1', 'seeking_collaborators=True',
+        'seeking_collaborators=', 'seeking_collaborators=true&seeking_collaborators=false',
+        'limit=1&limit=2', 'offset=0&offset=1', 'sort[]=newest', 'limit[x]=1'];
+      for (const query of invalid) {
+        const response = await request('GET', `/api/projects?${query}`);
+        assert.equal(response.status, 400, query);
+        assert.equal(typeof response.body.error.message, 'string');
       }
     });
   } finally {

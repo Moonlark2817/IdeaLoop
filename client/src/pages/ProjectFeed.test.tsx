@@ -67,3 +67,50 @@ test('normalizes malformed URL parameters to safe defaults', async () => {
   expect(lastRequest(fetcher).get('q')).toBeNull();
   expect(lastRequest(fetcher).get('offset')).toBe('0');
 });
+
+test('uses has_more instead of page length and preserves filters during pagination', async () => {
+  const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+    const offset = new URL(String(input), 'http://localhost').searchParams.get('offset');
+    return response(offset === '0' ? 'First page' : 'Last page', offset === '0', 20);
+  });
+  show('/projects?q=art&sort=oldest&seeking_collaborators=true');
+  await screen.findAllByText('First page');
+  expect(screen.getByText('Previous')).toBeDisabled();
+  await userEvent.click(screen.getByText('Next'));
+  await screen.findAllByText('Last page');
+  expect(screen.getByText('Next')).toBeDisabled();
+  expect(lastRequest(fetcher).get('q')).toBe('art');
+  expect(lastRequest(fetcher).get('offset')).toBe('20');
+  expect(lastRequest(fetcher).get('seeking_collaborators')).toBe('true');
+  await userEvent.click(screen.getByText('Previous'));
+  await screen.findAllByText('First page');
+  expect(currentParams().get('offset')).toBeNull();
+});
+
+test('distinguishes filtered empty results and retries failures without losing filters', async () => {
+  const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response('{"error":{"message":"Unavailable"}}', {status: 503}));
+  show('/projects?q=art&sort=oldest&seeking_collaborators=true&offset=20');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Unavailable');
+  fetcher.mockImplementation(async () => response('', false, 0));
+  await userEvent.click(screen.getByText('Retry'));
+  expect(await screen.findByRole('status')).toHaveTextContent('No projects match your filters.');
+  expect(lastRequest(fetcher).get('offset')).toBe('20');
+  expect(lastRequest(fetcher).get('q')).toBe('art');
+  await userEvent.click(screen.getByText('Clear filters'));
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('No projects yet.'));
+});
+
+test('aborts obsolete requests and ignores responses that arrive out of order', async () => {
+  const pending: Array<{resolve: (response: Response) => void; signal: AbortSignal}> = [];
+  vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => new Promise(resolve => pending.push({resolve, signal: init!.signal as AbortSignal})));
+  show();
+  await waitFor(() => expect(pending).toHaveLength(1));
+  await userEvent.selectOptions(screen.getByLabelText('Sort projects'), 'oldest');
+  await waitFor(() => expect(pending).toHaveLength(2));
+  expect(pending[0].signal.aborted).toBe(true);
+  await act(async () => pending[1].resolve(response('Current results')));
+  expect(await screen.findByText('Current results')).toBeInTheDocument();
+  await act(async () => pending[0].resolve(response('Stale results')));
+  expect(screen.queryByText('Stale results')).not.toBeInTheDocument();
+  expect(screen.getByText('Current results')).toBeInTheDocument();
+});

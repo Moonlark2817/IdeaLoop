@@ -11,7 +11,7 @@ import { tokenKey } from '../api';
 const project = {id: 1, user_id: 1, title: 'Test work', description: 'Description', project_url: 'javascript:alert(1)', is_seeking_collaborators: false, created_at: '2026-01-01'};
 afterEach(() => vi.restoreAllMocks());
 test('feed handles pagination and failed requests', async () => {
- const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({projects: Array.from({length:20}, (_, i) => ({...project, id:i+1})), pagination:{limit:20,offset:0}})));
+ const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({projects: Array.from({length:20}, (_, i) => ({...project, id:i+1})), pagination:{limit:20,offset:0,has_more:true}})));
  render(<MemoryRouter><ProjectFeed /></MemoryRouter>); await screen.findAllByText('Test work');
  fetcher.mockResolvedValue(new Response('{"error":{"message":"Unavailable"}}', {status:503})); await userEvent.click(screen.getByRole('button', {name:'Next'})); expect(await screen.findByRole('alert')).toHaveTextContent('Unavailable');
 });

@@ -34,10 +34,10 @@ export default function ProjectFeed() {
     setResult({key: canonical, status: 'loading', projects: [], hasMore: false, error: ''});
     getProjects({q, sort, seekingCollaborators: seekingCollaborators ? true : undefined, offset}, controller.signal)
       .then(data => {
-        setResult({key: canonical, status: 'ready', projects: data.projects, hasMore: data.projects.length === 20, error: ''});
+        if (!controller.signal.aborted) setResult({key: canonical, status: 'ready', projects: data.projects, hasMore: data.pagination.has_more, error: ''});
       })
       .catch(error => {
-        if (error.name !== 'AbortError') setResult({key: canonical, status: 'error', projects: [], hasMore: false, error: error.message});
+        if (!controller.signal.aborted) setResult({key: canonical, status: 'error', projects: [], hasMore: false, error: error.message});
       });
     return () => controller.abort();
   }, [canonical, q, sort, seekingCollaborators, offset, attempt]);
@@ -56,6 +56,7 @@ export default function ProjectFeed() {
     setParams({});
   }
   const loading = result.key !== canonical || result.status === 'loading';
+  const filtered = Boolean(q || seekingCollaborators);
 
   return <main className="page-container">
     <header className="feed-header">
@@ -79,7 +80,7 @@ export default function ProjectFeed() {
       </div>
     </section>
     {loading ? <p role="status">Loading projects…</p> : result.status === 'error' ? <div role="alert"><p className="error-message">{result.error}</p><button onClick={() => setAttempt(n => n + 1)}>Retry</button></div> : <>
-      <p role="status">{result.projects.length ? `Showing ${result.projects.length} projects · Page ${Math.floor(offset / 20) + 1}` : 'No projects on this page yet.'}</p>
+      <p role="status">{result.projects.length ? `Showing ${result.projects.length} projects · Page ${Math.floor(offset / 20) + 1}` : filtered ? 'No projects match your filters.' : offset ? 'No projects on this page.' : 'No projects yet. Share the first one!'}</p>
       <div className="project-grid">{result.projects.map(project => <ProjectCard key={project.id} project={project} />)}</div>
       <div className="form-actions" aria-label="Project pagination">
         <button className="secondary-button" disabled={!offset} onClick={() => setParams(feedSearchParams({...filters, offset: Math.max(0, offset - 20)}))}>Previous</button>

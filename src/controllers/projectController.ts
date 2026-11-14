@@ -46,8 +46,8 @@ export function createProjectController(db: Kysely<Database>) {
     } else {
       query = query.orderBy('id');
     }
-    const projects = await query.limit(limit).offset(offset).execute();
-    res.json({ projects, pagination: { limit, offset } });
+    const rows = await query.limit(limit + 1).offset(offset).execute();
+    res.json({ projects: rows.slice(0, limit), pagination: { limit, offset, has_more: rows.length > limit } });
   };
   const get: RequestHandler = async (req, res) => {
     res.json({ project: await find(projectId(req.params.id)) });
