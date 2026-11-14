@@ -264,3 +264,7 @@ omitting sort preserves ascending-ID API ordering.
 Use `seeking_collaborators=true` or `false` to filter projects. Omit it to include
 both. The feed checkbox shows only projects seeking collaborators. Filters combine
 before pagination, and changing the checkbox returns to page one.
+
+Applied filters and pagination are stored in shareable URLs. Reloading and browser
+back/forward restore them; invalid URL values fall back to safe defaults. Clear
+filters restores the default feed.
