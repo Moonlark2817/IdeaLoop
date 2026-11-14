@@ -20,3 +20,18 @@ test('handles network errors, cancellation, and non-JSON errors', async () => {
 test('validates clickable external links', () => {
  expect(safeUrl('https://example.com')).toBe(true); for (const url of ['javascript:alert(1)', 'https://user:pass@example.com', 'invalid']) expect(safeUrl(url)).toBe(false);
 });
+
+test('encodes discovery filters without treating user input as query parameters', async () => {
+ const {getProjects} = await import('./api');
+ const controller = new AbortController();
+ const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({projects: [], pagination: {limit: 20, offset: 40, has_more: false}})));
+ const response = await getProjects({q: '  music & art_%\\  ', sort: 'newest', seekingCollaborators: false, offset: 40}, controller.signal);
+ const url = new URL(fetcher.mock.calls[0][0] as string, 'http://localhost');
+ expect(url.searchParams.get('q')).toBe('music & art_%\\');
+ expect(url.searchParams.get('sort')).toBe('newest');
+ expect(url.searchParams.get('seeking_collaborators')).toBe('false');
+ expect(url.searchParams.get('offset')).toBe('40');
+ expect(url.searchParams.get('limit')).toBe('20');
+ expect(fetcher.mock.calls[0][1]?.signal).toBe(controller.signal);
+ expect(response.pagination.has_more).toBe(false);
+});

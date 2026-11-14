@@ -1,9 +1,9 @@
 import type { RequestHandler } from 'express';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import type { Database } from '../db/types.js';
 import { HttpError } from '../middleware/httpError.js';
 import { pagination } from './userValidation.js';
-import { projectId, projectInput } from './projectValidation.js';
+import { projectId, projectInput, projectDiscovery } from './projectValidation.js';
 
 export function createProjectController(db: Kysely<Database>) {
   async function find(id: number) {
@@ -27,8 +27,27 @@ export function createProjectController(db: Kysely<Database>) {
   const list: RequestHandler = async (req, res) => {
     const limit = pagination(req.query.limit, 20, 100);
     const offset = pagination(req.query.offset, 0, 2147483647);
-    const projects = await db.selectFrom('projects').selectAll().orderBy('id').limit(limit).offset(offset).execute();
-    res.json({ projects, pagination: { limit, offset } });
+    const filters = projectDiscovery(req.query);
+    let query = db.selectFrom('projects').selectAll();
+    if (filters.q) {
+      // Escape LIKE metacharacters so user text is a literal substring.
+      const pattern = `%${filters.q.replace(/[\\%_]/g, character => `\\${character}`)}%`;
+      query = query.where(eb => eb.or([
+        eb('title', 'ilike', pattern), eb('description', 'ilike', pattern),
+      ]));
+    }
+    if (filters.seekingCollaborators !== undefined) {
+      query = query.where('is_seeking_collaborators', '=', filters.seekingCollaborators);
+    }
+    if (filters.sort === 'newest') {
+      query = query.orderBy(sql`created_at desc nulls last`).orderBy('id', 'desc');
+    } else if (filters.sort === 'oldest') {
+      query = query.orderBy(sql`created_at asc nulls last`).orderBy('id', 'asc');
+    } else {
+      query = query.orderBy('id');
+    }
+    const rows = await query.limit(limit + 1).offset(offset).execute();
+    res.json({ projects: rows.slice(0, limit), pagination: { limit, offset, has_more: rows.length > limit } });
   };
   const get: RequestHandler = async (req, res) => {
     res.json({ project: await find(projectId(req.params.id)) });

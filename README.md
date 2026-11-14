@@ -140,7 +140,7 @@ Project reads are public. Creation requires a Bearer token; updates and deletion
 | Method | Endpoint | Result |
 | --- | --- | --- |
 | POST | `/api/projects` | 201 with `{ project }` and a Location header |
-| GET | `/api/projects?limit=20&offset=0` | `{ projects, pagination: { limit, offset } }`, ordered by ascending ID; maximum limit 100 |
+| GET | `/api/projects?limit=20&offset=0` | `{ projects, pagination: { limit, offset, has_more } }`; ascending ID by default; maximum limit 100 |
 | GET | `/api/projects/:id` | `{ project }` |
 | PATCH | `/api/projects/:id` | Partial update returning `{ project }` |
 | DELETE | `/api/projects/:id` | 204 without a body |
@@ -163,6 +163,41 @@ curl -X PATCH http://localhost:5000/api/projects/1 \
 
 Use the ID returned by creation in place of `1`. Deleting a project cascades to its media, tag/skill assignments, likes, saves, comments (including replies), and project-linked collaboration requests. Shared tag/skill catalog entries and unrelated projects remain. Media management, tag/skill assignment, and uploads are separate features.
 
+
+### Project discovery (#54)
+
+The public project feed supports searching titles/descriptions, sorting newest or
+oldest first, and showing only projects seeking collaborators. Search applies on
+form submission; sort/filter changes apply immediately and return to page one.
+Clear filters restores newest-first browsing. Applied filters and pagination are
+stored in the URL, so sharing, reloading, and browser back/forward retain them.
+
+`GET /api/projects` accepts these optional query parameters alongside `limit`
+(default 20, maximum 100) and `offset` (default 0):
+
+| Parameter | Accepted values |
+| --- | --- |
+| `q` | Trimmed search text, at most 200 characters; empty text means no search |
+| `sort` | `newest` or `oldest` |
+| `seeking_collaborators` | `true` or `false`; omit to include both |
+
+Search is a case-insensitive literal substring match across title OR description.
+Percent signs, underscores, and backslashes are literal characters, not wildcard
+operators. Filters combine before pagination. Explicit sorting uses creation time
+and ID as a tie-breaker, with null creation times last. Omitting `sort` preserves
+ascending-ID API ordering; the React feed explicitly requests `newest` by default.
+Malformed/repeated recognized parameters return 400 in the normal JSON error format.
+
+Responses retain existing project fields and add `pagination.has_more`. Next-page
+availability is determined using one extra matching row, without a total count.
+An exactly full final page correctly returns `has_more: false`.
+
+```sh
+curl 'http://localhost:5000/api/projects?q=art&sort=newest&seeking_collaborators=true&limit=20&offset=0'
+```
+
+No database migration is needed. Discovery does not include tag/skill filters,
+recommendations, popularity ranking, or uploads.
 
 ## Comment API
 
