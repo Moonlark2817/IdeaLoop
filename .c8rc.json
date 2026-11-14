@@ -1,0 +1,17 @@
+{
+  "all": true,
+  "extension": [".ts"],
+  "include": [
+    "src/app.ts",
+    "src/controllers/**/*.ts",
+    "src/routes/**/*.ts",
+    "src/middleware/**/*.ts",
+    "src/security/**/*.ts",
+    "src/config/**/*.ts",
+    "src/storage/s3Storage.ts"
+  ],
+  "exclude": ["src/tests/**", "src/db/**", "src/server.ts", "src/storage/check.ts"],
+  "exclude-after-remap": true,
+  "reporter": ["text", "html", "lcov"],
+  "reports-dir": "coverage"
+}

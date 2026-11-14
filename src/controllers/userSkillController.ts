@@ -45,7 +45,7 @@ export function createUserSkillController(db: Kysely<Database>) {
     const rows = raw.map((item: unknown) => {
       if (typeof item !== 'object' || item === null) throw new HttpError(400, 'Each skill must be an object');
       const s = item as Record<string, unknown>;
-      if (typeof s.skill_id !== 'number' || !Number.isInteger(s.skill_id) || s.skill_id <= 0) {
+      if (typeof s.skill_id !== 'number' || !Number.isInteger(s.skill_id) || s.skill_id <= 0 || s.skill_id > 2147483647) {
         throw new HttpError(400, 'Each skill needs a valid skill_id');
       }
       const level = s.proficiency_level ?? null;

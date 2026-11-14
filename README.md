@@ -299,3 +299,50 @@ Once your bucket and credentials are configured, `npm run storage:check` verifie
 bucket access without writing or deleting objects. Live AWS access has not been
 verified by automated tests. Project upload endpoints and frontend image controls
 remain the separate image-upload task (#46); no database migration is introduced.
+
+## Backend regression tests, coverage, and CI (#52)
+
+```sh
+npm ci
+npm test
+npm run test:coverage
+npm run typecheck
+npm run build
+```
+
+The backend suite uses Node's test runner, actual Express HTTP requests, and real
+Kysely queries/migrations against isolated PGlite databases. It covers authentication
+and permissions, project/comment CRUD and discovery, rejected writes preserving
+stored data, user-skill replacement rollback and boundaries, shared mutation rate
+limits, malformed JWT/password hashes, and HTTP parsing/error responses. S3 tests
+use explicit test credentials and mocked SDK calls/local signing; no AWS account,
+external PostgreSQL service, `.env`, or cloud secrets are required.
+
+New HTTP/database regression suites use `src/tests/helpers/testApp.ts`. Each fixture
+gets its own database, migrations, app/rate limiters, and ephemeral HTTP port, with
+HTTP and database cleanup registered even when assertions fail. The helper also
+supports tests of Express middleware through an ephemeral server. Its single-client
+PGlite adapter is for sequential regression checks, not assertions about real
+multi-connection PostgreSQL concurrency. Existing suites remain intact.
+
+`npm run test:coverage` runs the same backend test files with c8 and writes terminal,
+HTML (`coverage/index.html`), and LCOV (`coverage/lcov.info`) reports. Reports and raw
+coverage data are ignored by Git. `.c8rc.json` includes unvisited files when measuring
+app setup, controllers, routes, middleware, security, configuration, and the S3
+service. It excludes test/helpers, database code and migrations, type-only files,
+server/process startup, and the storage-check CLI entrypoint. Those exclusions keep
+the report focused on application logic; migrations and the CLI still execute in
+integration tests. Coverage is reported without a percentage gate in this iteration.
+High coverage does not replace the behavior assertions or prove live AWS behavior.
+
+The backend GitHub Actions workflow (`.github/workflows/backend.yml`) runs for PRs
+into `main` and pushes to `main` or `mokshil`. Its Node.js 22/24 matrix installs the
+root lockfile with `npm ci`, checks types, builds, and runs the coverage suite.
+Coverage artifacts are uploaded separately for each Node version and retained for
+14 days. Test failures fail the job even though artifact upload still runs. The
+workflow uses read-only repository permissions and requires no cloud/database
+secrets. Hosted workflow results become available after the workflow is pushed.
+
+A regression test exposed a skill-ID validation gap: values above PostgreSQL's
+integer range previously reached the database and returned 500. They now return
+400 before any replacement occurs, and existing assignments remain unchanged.
