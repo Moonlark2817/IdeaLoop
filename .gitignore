@@ -24,3 +24,6 @@ yarn-error.log*
 client/test-results/
 client/playwright-report/
 *.tsbuildinfo
+
+# Backend coverage reports
+coverage/

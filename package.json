@@ -16,7 +16,8 @@
     "client:test": "npm test --prefix client",
     "client:build": "npm run build --prefix client",
     "client:e2e": "npm run e2e --prefix client",
-    "storage:check": "tsx src/storage/check.ts"
+    "storage:check": "tsx src/storage/check.ts",
+    "test:coverage": "c8 node --import tsx --test src/tests/*.test.ts"
   },
   "repository": {
     "type": "git",
@@ -46,6 +47,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
+    "c8": "^9.1.0",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   },
