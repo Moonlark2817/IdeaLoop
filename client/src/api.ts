@@ -43,6 +43,49 @@ export const getProject = async (id: string, signal?: AbortSignal) => (await req
 export const createProject = async (data: ProjectInput) => (await request<{project: Project}>('/projects', { method: 'POST', body: JSON.stringify(data) })).project;
 export const updateProject = async (id: string, data: ProjectInput) => (await request<{project: Project}>(`/projects/${id}`, { method: 'PATCH', body: JSON.stringify(data) })).project;
 export const deleteProject = (id: string) => request<void>(`/projects/${id}`, { method: 'DELETE' });
+
+
+export interface ProjectTag {
+  id: number;
+  name: string;
+}
+
+export interface ProjectSkill {
+  id: number;
+  name: string;
+  category: string | null;
+}
+
+export interface ProjectAssociations {
+  tags: ProjectTag[];
+  skills: ProjectSkill[];
+}
+
+
+export const getAvailableProjectTags = (signal?: AbortSignal) =>
+  request<{ tags: ProjectTag[] }>('/projects/tags/catalog', { signal });
+
+export const getAvailableSkills = (signal?: AbortSignal) =>
+  request<{ skills: ProjectSkill[] }>('/users/skills/catalog', { signal });
+
+
+export const getProjectTags = (id: string, signal?: AbortSignal) =>
+  request<ProjectAssociations>(`/projects/${id}/tags`, { signal });
+
+export const saveProjectTags = (
+  id: string,
+  tagIds: number[],
+  skillIds: number[]
+) =>
+  request<ProjectAssociations>(`/projects/${id}/tags`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      tag_ids: tagIds,
+      skill_ids: skillIds
+    })
+  });
+
+
 export const getComments = (id: string, offset = 0, signal?: AbortSignal) => request<{comments: Comment[]; pagination: {limit: number; offset: number}}>(`/projects/${id}/comments?limit=20&offset=${offset}`, { signal });
 export const getComment = (project: string, id: number) => request<{comment: Comment}>(`/projects/${project}/comments/${id}`);
 export const saveComment = (project: string, content: string, id?: number, parent_comment_id?: number) => request<{comment: Comment}>(`/projects/${project}/comments${id ? `/${id}` : ''}`, { method: id ? 'PATCH' : 'POST', body: JSON.stringify(id ? {content} : {content, parent_comment_id}) });

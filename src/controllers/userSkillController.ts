@@ -9,6 +9,18 @@ const LEVELS = ['Beginner', 'Intermediate', 'Advanced', 'Expert'] as const;
 type Level = (typeof LEVELS)[number];
 
 export function createUserSkillController(db: Kysely<Database>) {
+
+  // GET /api/users/skills/catalog
+  const catalog: RequestHandler = async (_req, res) => {
+    const skills = await db
+      .selectFrom('skills')
+      .select(['id', 'name', 'category'])
+      .orderBy('name')
+      .execute();
+
+    res.json({ skills });
+  };
+
   async function assertUserExists(id: number) {
     const user = await db.selectFrom('users').select('id').where('id', '=', id).executeTakeFirst();
     if (!user) throw new HttpError(404, 'User not found');
@@ -81,5 +93,5 @@ export function createUserSkillController(db: Kysely<Database>) {
     res.json({ skills: await fetchSkills(id) });
   };
 
-  return { list, replace };
+      return { catalog, list, replace };
 }

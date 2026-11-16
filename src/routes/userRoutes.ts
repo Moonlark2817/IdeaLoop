@@ -28,6 +28,7 @@ export function createUserRoutes(db: Kysely<Database>, secret: string) {
   users.patch('/:id', mutationLimit, authenticate, controller.update);
   users.delete('/:id', mutationLimit, authenticate, controller.remove);
   const skills = createUserSkillController(db);
+  users.get('/skills/catalog', skills.catalog);
   users.get('/:id/skills', skills.list);
   users.put('/:id/skills', mutationLimit, authenticate, skills.replace);
   return { users, auth };
