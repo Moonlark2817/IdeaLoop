@@ -11,6 +11,7 @@ export default function ProjectDetails() {
   const { user } = useAuth();
 
   const [project, setProject] = useState<Project | null>(null);
+  const [media, setMedia] = useState<ProjectMedia[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -32,24 +33,36 @@ export default function ProjectDetails() {
 
     try {
       setDeleting(true);
+
       await deleteProject(id);
+
       navigate("/projects");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Unable to delete project."
+        err instanceof Error
+          ? err.message
+          : "Unable to delete project."
       );
+
       setDeleting(false);
     }
   }
 
   if (loading) {
-    return <main className="page-container">Loading project...</main>;
+    return (
+      <main className="page-container">
+        Loading project...
+      </main>
+    );
   }
 
   if (!project) {
     return (
       <main className="page-container">
-        <p className="error-message">{error || "Project not found."}</p>
+        <p className="error-message">
+          {error || "Project not found."}
+        </p>
+
         <Link to="/projects" className="text-link">
           Back to projects
         </Link>
@@ -65,7 +78,9 @@ export default function ProjectDetails() {
 
       <article className="details-card">
         <div className="details-top">
-          <span className="project-category">Community Project</span>
+          <span className="project-category">
+            Community Project
+          </span>
 
           {project.is_seeking_collaborators && (
             <span className="collaborator-badge">
@@ -83,7 +98,10 @@ export default function ProjectDetails() {
 
         <div className="details-section">
           <h2>About This Project</h2>
-          <p className="details-description">{project.description}</p>
+
+          <p className="details-description">
+            {project.description}
+          </p>
         </div>
 
         {safeUrl(project.project_url) && (
