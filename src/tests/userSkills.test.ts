@@ -141,6 +141,20 @@ test('User Skills API integration tests', async (t) => {
 
     const path = `/api/users/${aliceId}/skills`;
 
+    await t.test('GET catalog returns available skills', async () => {
+      const response = await request('GET', '/api/users/skills/catalog');
+
+      assert.equal(response.status, 200);
+
+      assert.deepEqual(response.body, {
+        skills: [
+          { id: coding.id, name: 'Coding', category: 'Technology' },
+          { id: drawing.id, name: 'Drawing', category: 'Art' },
+          { id: music.id, name: 'Music', category: 'Music' },
+        ],
+      });
+    });
+
     await t.test('GET returns an empty skills list', async () => {
       const response = await request('GET', path);
 

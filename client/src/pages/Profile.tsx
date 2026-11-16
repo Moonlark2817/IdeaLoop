@@ -14,6 +14,12 @@ interface Skill {
   is_open_to_teach: boolean;
 }
 
+interface CatalogSkill {
+  id: number;
+  name: string;
+  category: string;
+}
+
 type PublicUser = Omit<User, "email"> & { email?: string };
 
 export function MyProfile() {
@@ -29,6 +35,9 @@ export default function Profile() {
 
   const [profile, setProfile] = useState<PublicUser | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
+  const [availableSkills, setAvailableSkills] = useState<CatalogSkill[]>([]);
+  const [selectedSkillId, setSelectedSkillId] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -49,13 +58,17 @@ export default function Profile() {
 
     Promise.all([
       request<{ user: PublicUser }>(`/users/${id}`),
-      request<{ skills: Skill[] }>(`/users/${id}/skills`)
+      request<{ skills: Skill[] }>(`/users/${id}/skills`),
+      request<{ skills: CatalogSkill[] }>('/users/skills/catalog')
     ])
-      .then(([userData, skillData]) => {
+      .then(([userData, skillData, catalogData]) => {
         if (cancelled) return;
         setProfile(userData.user);
         setSkills(skillData.skills);
+        setAvailableSkills(catalogData.skills);
       })
+
+
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Unable to load profile.");
       })
@@ -84,6 +97,29 @@ export default function Profile() {
 
   function removeSkill(skillId: number) {
     setSkillDraft((draft) => draft.filter((skill) => skill.id !== skillId));
+  }
+
+  function addSkill() {
+    const selected = availableSkills.find(
+      (skill) => skill.id === Number(selectedSkillId)
+    );
+
+    if (!selected) return;
+
+    if (skillDraft.some((skill) => skill.id === selected.id)) return;
+
+    setSkillDraft((draft) => [
+      ...draft,
+      {
+        id: selected.id,
+        name: selected.name,
+        category: selected.category,
+        proficiency_level: null,
+        is_open_to_teach: false,
+      },
+    ]);
+
+    setSelectedSkillId("");
   }
 
   async function handleSave(event: FormEvent) {
@@ -200,6 +236,28 @@ export default function Profile() {
           </div>
 
           <h2>Skills</h2>
+
+          <div>
+            <label htmlFor="addSkill">Add a skill</label>{" "}
+            <select
+              id="addSkill"
+              value={selectedSkillId}
+              onChange={(e) => setSelectedSkillId(e.target.value)}
+            >
+              <option value="">Select a skill</option>
+              {availableSkills
+                .filter((skill) => !skillDraft.some((item) => item.id === skill.id))
+                .map((skill) => (
+                  <option key={skill.id} value={skill.id}>
+                    {skill.name} ({skill.category})
+                  </option>
+                ))}
+            </select>{" "}
+            <button type="button" onClick={addSkill} disabled={!selectedSkillId}>
+              Add
+            </button>
+          </div>
+
           {skillDraft.length === 0 ? (
             <p>No skills listed.</p>
           ) : (

@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { deleteProject, getProject, safeUrl } from "../api";
+import {
+  deleteProject,
+  getProject,
+  getProjectTags,
+  safeUrl,
+  type ProjectAssociations
+} from "../api";
 import Comments from '../components/Comments';
 import { useAuth } from '../auth';
 import type { Project } from "../types";
@@ -11,6 +17,12 @@ export default function ProjectDetails() {
   const { user } = useAuth();
 
   const [project, setProject] = useState<Project | null>(null);
+
+  const [associations, setAssociations] = useState<ProjectAssociations>({
+  tags: [],
+  skills: []
+});
+
   const [media, setMedia] = useState<ProjectMedia[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -19,6 +31,15 @@ export default function ProjectDetails() {
   useEffect(() => {
     const controller = new AbortController(); setLoading(true); setError(''); setProject(null);
     getProject(id!, controller.signal).then(setProject).catch(err => {if (err.name !== 'AbortError') setError(err.message);}).finally(() => {if (!controller.signal.aborted) setLoading(false);});
+
+    getProjectTags(id!, controller.signal)
+  .then(setAssociations)
+  .catch((err) => {
+    if (err.name !== "AbortError") {
+      setError("Unable to load project tags and skills.");
+    }
+  });
+
     return () => controller.abort();
   }, [id]);
 
@@ -103,6 +124,33 @@ export default function ProjectDetails() {
             {project.description}
           </p>
         </div>
+
+
+        {associations.tags.length > 0 && (
+  <div className="details-section">
+    <h2>Project Tags</h2>
+    <div>
+      {associations.tags.map((tag) => (
+        <span key={tag.id} className="project-category">
+          {tag.name}{" "}
+        </span>
+      ))}
+    </div>
+  </div>
+)}
+
+{associations.skills.length > 0 && (
+  <div className="details-section">
+    <h2>Project Skills</h2>
+    <div>
+      {associations.skills.map((skill) => (
+        <span key={skill.id} className="project-category">
+          {skill.name}{" "}
+        </span>
+      ))}
+    </div>
+  </div>
+)}
 
         {safeUrl(project.project_url) && (
           <div className="details-section">
