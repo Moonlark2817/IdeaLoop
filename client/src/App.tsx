@@ -6,12 +6,14 @@ import ProjectForm from './pages/ProjectForm';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Profile, { MyProfile } from './pages/Profile';
+import SavedProjects from './pages/SavedProjects';
 import { AuthProvider, Protected } from './auth';
 export function AppRoutes() {
  return <AuthProvider><Navbar /><div id="content" tabIndex={-1}><Routes>
  <Route path="/" element={<Navigate to="/projects" replace />} />
  <Route path="/login" element={<Login />} /><Route path="/signup" element={<Signup />} />
  <Route path="/register" element={<Navigate to="/signup" replace />} />
+ <Route path="/saved" element={<Protected><SavedProjects /></Protected>} />
  <Route path="/profile" element={<MyProfile />} /><Route path="/users/:id" element={<Profile />} />
  <Route path="/projects" element={<ProjectFeed />} /><Route path="/projects/new" element={<Protected><ProjectForm key="new" /></Protected>} />
  <Route path="/projects/:id" element={<ProjectDetails />} /><Route path="/projects/:id/edit" element={<Protected><ProjectForm key="edit" /></Protected>} />
