@@ -16,6 +16,12 @@ interface Skill {
 
 type PublicUser = Omit<User, "email"> & { email?: string };
 
+interface CatalogSkill {
+  id: number;
+  name: string;
+  category: string | null;
+}
+
 export function MyProfile() {
   const { user, loading } = useAuth();
   if (loading) return <main role="status">Loading...</main>;
@@ -36,6 +42,9 @@ export default function Profile() {
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [skillDraft, setSkillDraft] = useState<Skill[]>([]);
+  const [catalog, setCatalog] = useState<CatalogSkill[]>([]);
+  const [catalogError, setCatalogError] = useState("");
+  const [newSkillId, setNewSkillId] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -75,7 +84,25 @@ export default function Profile() {
     setSkillDraft(skills.map((skill) => ({ ...skill })));
     setSaveError("");
     setSaved(false);
+    setNewSkillId("");
+    setCatalogError("");
     setEditing(true);
+
+    // Load the skill catalog so the owner can add new skills.
+    request<{ skills: CatalogSkill[] }>("/skills")
+      .then((data) => setCatalog(data.skills))
+      .catch((err) => setCatalogError(err instanceof Error ? err.message : "Unable to load skills."));
+  }
+
+  function addSkill() {
+    const skill = catalog.find((item) => String(item.id) === newSkillId);
+    if (!skill) return;
+    setSkillDraft((draft) =>
+      draft.some((item) => item.id === skill.id)
+        ? draft
+        : [...draft, { ...skill, proficiency_level: null, is_open_to_teach: false }]
+    );
+    setNewSkillId("");
   }
 
   function updateSkill(skillId: number, changes: Partial<Skill>) {
@@ -93,7 +120,6 @@ export default function Profile() {
     setSaving(true);
 
     try {
-      // Empty fields clear the value on the backend.
       const userData = await request<{ user: User }>(`/users/${profile.id}`, {
         method: "PATCH",
         body: JSON.stringify({
@@ -116,7 +142,6 @@ export default function Profile() {
       setProfile(userData.user);
       setSkills(skillData.skills);
 
-      // Keep the logged-in user (shown in the navbar) in sync.
       const token = sessionStorage.getItem(tokenKey);
       if (token) auth.accept(userData.user, token);
 
@@ -236,6 +261,31 @@ export default function Profile() {
               ))}
             </ul>
           )}
+
+          <div>
+            <label htmlFor="newSkill">Add a skill</label>
+            <br />
+            {catalogError ? (
+              <p role="alert">{catalogError}</p>
+            ) : (
+              <>
+                <select id="newSkill" value={newSkillId} onChange={(e) => setNewSkillId(e.target.value)}>
+                  <option value="">Choose a skill</option>
+                  {catalog
+                    .filter((item) => !skillDraft.some((skill) => skill.id === item.id))
+                    .map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                        {item.category ? ` (${item.category})` : ""}
+                      </option>
+                    ))}
+                </select>{" "}
+                <button type="button" onClick={addSkill} disabled={!newSkillId}>
+                  Add
+                </button>
+              </>
+            )}
+          </div>
 
           {saveError && <p role="alert">{saveError}</p>}
 
