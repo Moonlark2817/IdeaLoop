@@ -77,3 +77,42 @@ export function seekingCollaborators(value: unknown): boolean {
 
   return value;
 }
+
+export function projectDiscovery(query: Record<string, unknown>) {
+  const rawSearch = query.q ?? '';
+
+  if (typeof rawSearch !== 'string' || rawSearch.length > 200) {
+    throw new HttpError(400, 'Search must be at most 200 characters');
+  }
+
+  const search = rawSearch.trim();
+
+  const rawSort = query.sort ?? 'newest';
+
+  if (rawSort !== 'newest' && rawSort !== 'oldest') {
+    throw new HttpError(400, 'Sort must be newest or oldest');
+  }
+
+  const rawSeeking = query.seeking_collaborators;
+
+  let seekingCollaboratorsFilter: boolean | undefined;
+
+  if (rawSeeking !== undefined && rawSeeking !== '') {
+    if (rawSeeking === 'true') {
+      seekingCollaboratorsFilter = true;
+    } else if (rawSeeking === 'false') {
+      seekingCollaboratorsFilter = false;
+    } else {
+      throw new HttpError(
+        400,
+        'seeking_collaborators must be true or false'
+      );
+    }
+  }
+
+  return {
+    search,
+    sort: rawSort,
+    seekingCollaborators: seekingCollaboratorsFilter,
+  };
+}

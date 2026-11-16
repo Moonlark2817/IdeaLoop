@@ -1,3 +1,12 @@
+export interface ProjectMedia {
+  id: number;
+  project_id: number;
+  media_url: string;
+  media_type: 'image' | 'video' | 'audio' | 'document';
+  display_order: number;
+  created_at: string | null;
+}
+
 export interface Project {
   id: number;
   user_id: number;

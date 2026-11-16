@@ -16,12 +16,40 @@ const projectFields = [
 ] as const;
 
 export function createProjectController(db: Kysely<Database>) {
-  const list: RequestHandler = async (_req, res) => {
-    const projects = await db
+  const list: RequestHandler = async (req, res) => {
+    const filters = validate.projectDiscovery(
+      req.query as Record<string, unknown>
+    );
+
+    let query = db
       .selectFrom('projects')
-      .select(projectFields)
-      .orderBy('created_at', 'desc')
-      .execute();
+      .select(projectFields);
+
+    if (filters.search) {
+      const searchTerm = `%${filters.search}%`;
+
+      query = query.where((eb) =>
+        eb.or([
+          eb('title', 'ilike', searchTerm),
+          eb('description', 'ilike', searchTerm),
+        ])
+      );
+    }
+
+    if (filters.seekingCollaborators !== undefined) {
+      query = query.where(
+        'is_seeking_collaborators',
+        '=',
+        filters.seekingCollaborators
+      );
+    }
+
+    query = query.orderBy(
+      'created_at',
+      filters.sort === 'oldest' ? 'asc' : 'desc'
+    );
+
+    const projects = await query.execute();
 
     res.json({ projects });
   };

@@ -1,13 +1,25 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { deleteProject, getProject } from "../api";
-import type { Project } from "../types";
+
+import {
+  deleteProject,
+  getProject,
+  getProjectMedia,
+} from "../api";
+
+import ProjectImageUpload from "../components/ProjectImageUpload";
+
+import type {
+  Project,
+  ProjectMedia,
+} from "../types";
 
 export default function ProjectDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
   const [project, setProject] = useState<Project | null>(null);
+  const [media, setMedia] = useState<ProjectMedia[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -15,13 +27,22 @@ export default function ProjectDetails() {
   useEffect(() => {
     async function loadProject() {
       try {
-        if (!id) throw new Error("Project ID is missing.");
+        if (!id) {
+          throw new Error("Project ID is missing.");
+        }
 
-        const data = await getProject(id);
-        setProject(data);
+        const [projectData, mediaData] = await Promise.all([
+          getProject(id),
+          getProjectMedia(id),
+        ]);
+
+        setProject(projectData);
+        setMedia(mediaData);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Unable to load project."
+          err instanceof Error
+            ? err.message
+            : "Unable to load project."
         );
       } finally {
         setLoading(false);
@@ -42,24 +63,36 @@ export default function ProjectDetails() {
 
     try {
       setDeleting(true);
+
       await deleteProject(id);
+
       navigate("/projects");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Unable to delete project."
+        err instanceof Error
+          ? err.message
+          : "Unable to delete project."
       );
+
       setDeleting(false);
     }
   }
 
   if (loading) {
-    return <main className="page-container">Loading project...</main>;
+    return (
+      <main className="page-container">
+        Loading project...
+      </main>
+    );
   }
 
   if (error || !project) {
     return (
       <main className="page-container">
-        <p className="error-message">{error || "Project not found."}</p>
+        <p className="error-message">
+          {error || "Project not found."}
+        </p>
+
         <Link to="/projects" className="text-link">
           Back to projects
         </Link>
@@ -75,7 +108,9 @@ export default function ProjectDetails() {
 
       <article className="details-card">
         <div className="details-top">
-          <span className="project-category">Community Project</span>
+          <span className="project-category">
+            Community Project
+          </span>
 
           {project.is_seeking_collaborators && (
             <span className="collaborator-badge">
@@ -93,8 +128,28 @@ export default function ProjectDetails() {
 
         <div className="details-section">
           <h2>About This Project</h2>
-          <p className="details-description">{project.description}</p>
+
+          <p className="details-description">
+            {project.description}
+          </p>
         </div>
+
+        {media.length > 0 && (
+          <section className="details-section">
+            <h2>Project Images</h2>
+
+            <div className="project-image-gallery">
+              {media.map((image) => (
+                <img
+                  key={image.id}
+                  src={image.media_url}
+                  alt={`${project.title} project`}
+                  loading="lazy"
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
         {project.project_url && (
           <div className="details-section">
@@ -128,6 +183,13 @@ export default function ProjectDetails() {
           </button>
         </div>
       </article>
+
+      <ProjectImageUpload
+        projectId={String(project.id)}
+        onUploaded={(newImage) => {
+          setMedia((previous) => [...previous, newImage]);
+        }}
+      />
     </main>
   );
 }
