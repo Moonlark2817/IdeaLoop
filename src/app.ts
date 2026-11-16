@@ -6,6 +6,7 @@ import type { Database } from './db/types.js';
 import { createUserRoutes } from './routes/userRoutes.js';
 import { createCommentRoutes } from './routes/commentRoutes.js';
 import { createProjectRoutes } from './routes/projectRoutes.js';
+import { createSkillRoutes } from './routes/skillRoutes.js';
 
 import {
   createErrorHandler,
@@ -65,6 +66,7 @@ export function createApp({
     const routes = createUserRoutes(users.db, users.jwtSecret);
     app.use('/api/users', routes.users);
     app.use('/api/auth', routes.auth);
+    app.use('/api/skills', createSkillRoutes(users.db));
     app.use('/api/projects/:projectId/comments', createCommentRoutes(users.db, users.jwtSecret));
     app.use('/api/projects', createProjectRoutes(users.db, users.jwtSecret));
   }
