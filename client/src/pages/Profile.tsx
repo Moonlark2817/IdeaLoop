@@ -24,7 +24,7 @@ interface CatalogSkill {
 
 export function MyProfile() {
   const { user, loading } = useAuth();
-  if (loading) return <main role="status">Loading...</main>;
+  if (loading) return <main className="page-container"><p role="status">Loading...</p></main>;
   return user ? <Navigate to={`/users/${user.id}`} replace /> : <Navigate to="/login" state={{ from: "/profile" }} replace />;
 }
 
@@ -120,6 +120,7 @@ export default function Profile() {
     setSaving(true);
 
     try {
+      // Empty fields clear the value on the backend.
       const userData = await request<{ user: User }>(`/users/${profile.id}`, {
         method: "PATCH",
         body: JSON.stringify({
@@ -142,6 +143,7 @@ export default function Profile() {
       setProfile(userData.user);
       setSkills(skillData.skills);
 
+      // Keep the logged-in user (shown in the navbar) in sync.
       const token = sessionStorage.getItem(tokenKey);
       if (token) auth.accept(userData.user, token);
 
@@ -154,11 +156,11 @@ export default function Profile() {
     }
   }
 
-  if (loading) return <main role="status">Loading profile...</main>;
+  if (loading) return <main className="page-container"><p role="status">Loading profile...</p></main>;
 
   if (error || !profile) {
     return (
-      <main>
+      <main className="page-container">
         <h1>Profile not found</h1>
         <p role="alert">{error || "This user does not exist."}</p>
         <Link to="/projects">Back to projects</Link>
@@ -167,7 +169,8 @@ export default function Profile() {
   }
 
   return (
-    <main>
+    <main className="page-container form-page">
+      <section className="details-card">
       <h1>{profile.username}</h1>
 
       {profile.avatar_url && (
@@ -199,10 +202,10 @@ export default function Profile() {
 
           {isOwner && (
             <p>
-              <button type="button" onClick={startEditing}>
+              <button type="button" className="primary-button" onClick={startEditing}>
                 Edit profile
               </button>{" "}
-              <Link to="/saved">Saved projects</Link>
+              <Link to="/saved" className="text-link">Saved projects</Link>
             </p>
           )}
         </>
@@ -292,7 +295,7 @@ export default function Profile() {
 
           {saveError && <p role="alert">{saveError}</p>}
 
-          <button type="submit" disabled={saving}>
+          <button type="submit" className="primary-button" disabled={saving}>
             {saving ? "Saving..." : "Save"}
           </button>{" "}
           <button type="button" onClick={() => setEditing(false)} disabled={saving}>
@@ -300,6 +303,7 @@ export default function Profile() {
           </button>
         </form>
       )}
+      </section>
     </main>
   );
 }

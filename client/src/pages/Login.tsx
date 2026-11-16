@@ -30,11 +30,12 @@ export default function Login() {
   }
 
   return (
-    <main>
+    <main className="page-container form-page">
+      <section className="form-card">
       <h1>Log in</h1>
 
       <form onSubmit={handleSubmit}>
-        <div>
+        <div className="form-group">
           <label htmlFor="email">Email</label>
           <br />
           <input
@@ -47,7 +48,7 @@ export default function Login() {
           />
         </div>
 
-        <div>
+        <div className="form-group">
           <label htmlFor="password">Password</label>
           <br />
           <input
@@ -64,7 +65,7 @@ export default function Login() {
 
       {error && <p role="alert">{error}</p>}
 
-        <button type="submit" disabled={submitting}>
+        <button type="submit" className="primary-button" disabled={submitting}>
           {submitting ? "Logging in..." : "Log in"}
         </button>
       </form>
@@ -72,6 +73,7 @@ export default function Login() {
       <p>
         Don't have an account? <Link to="/signup" state={location.state}>Sign up</Link>
       </p>
+      </section>
     </main>
   );
 }
