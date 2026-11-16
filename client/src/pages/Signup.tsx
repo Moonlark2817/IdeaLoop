@@ -80,11 +80,12 @@ export default function Signup() {
   }
 
   return (
-    <main>
+    <main className="page-container form-page">
+      <section className="form-card">
       <h1>Sign up</h1>
 
       <form onSubmit={handleSubmit}>
-        <div>
+        <div className="form-group">
           <label htmlFor="username">Username</label>
           <br />
           <input
@@ -99,7 +100,7 @@ export default function Signup() {
           <small>3-50 letters, numbers, or underscores.</small>
         </div>
 
-        <div>
+        <div className="form-group">
           <label htmlFor="email">Email</label>
           <br />
           <input
@@ -113,7 +114,7 @@ export default function Signup() {
           />
         </div>
 
-        <div>
+        <div className="form-group">
           <label htmlFor="password">Password</label>
           <br />
           <input
@@ -129,7 +130,7 @@ export default function Signup() {
           <small>At least {PASSWORD_MIN} characters.</small>
         </div>
 
-        <div>
+        <div className="form-group">
           <label htmlFor="confirmPassword">Confirm password</label>
           <br />
           <input
@@ -143,7 +144,7 @@ export default function Signup() {
           />
         </div>
 
-        <div>
+        <div className="form-group">
           <label htmlFor="bio">Bio (optional)</label>
           <br />
           <textarea
@@ -157,7 +158,7 @@ export default function Signup() {
 
         {error && <p role="alert">{error}</p>}
 
-        <button type="submit" disabled={submitting}>
+        <button type="submit" className="primary-button" disabled={submitting}>
           {submitting ? "Creating account..." : "Sign up"}
         </button>
       </form>
@@ -165,6 +166,7 @@ export default function Signup() {
       <p>
         Already have an account? <Link to="/login" state={location.state}>Log in</Link>
       </p>
+      </section>
     </main>
   );
 }
