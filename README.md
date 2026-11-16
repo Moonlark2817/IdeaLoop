@@ -2,7 +2,7 @@
 
 IdeaLoop lets creatives share projects across coding, art, music, writing, and crafts, discover work through tags and skills, and connect through learning and collaboration requests.
 
-This repository currently contains the Express + TypeScript backend and PostgreSQL schema. Backend source lives in root `src/`; the `client/` and `server/` split in the project structure reference has not been introduced.
+This repository contains the Express + TypeScript backend, PostgreSQL schema, and React frontend. Backend source lives in root `src/`; the React frontend lives in `client/`.
 
 ## Local setup
 
@@ -27,7 +27,7 @@ npm run db:migrate
 npm run dev
 ```
 
-The API listens on `PORT` (default `5000`). `DATABASE_URL` is required. `NODE_ENV` must be `development`, `test`, or `production`. The API requires `JWT_SECRET`; migrations do not require it. S3 placeholders are reserved for future uploads.
+The API listens on `PORT` (default `5000`). `DATABASE_URL` is required. `NODE_ENV` must be `development`, `test`, or `production`. The API requires `JWT_SECRET`; migrations do not require it. AWS S3 storage is optional and disabled by default; see [object storage setup](docs/object-storage.md).
 
 ## Commands
 
@@ -72,7 +72,7 @@ src/
   tests/                     Configuration, HTTP, and database integration tests
 ```
 
-User CRUD and basic registration/login are implemented. Project/comment/request endpoints, uploads, password recovery, email verification, and the React frontend remain future work. Cross-origin frontend access is not configured yet; configure the allowed frontend origin when the client is introduced.
+User CRUD and basic registration/login are implemented. Request endpoints, uploads, password recovery, and email verification remain future work. The React frontend is in `client/` and uses a development API proxy; see below.
 
 ## Database
 
@@ -131,3 +131,218 @@ Registration and login share an in-memory limit of 20 requests per IP per 15 min
 Migration `005_user_identity` adds case-insensitive unique indexes without rewriting existing migrations. Existing databases with case-only duplicate usernames or emails must resolve those duplicates before applying it. The raw SQL alternative includes equivalent indexes in `db/modules/05_user_identity.sql`.
 
 Tests run the real migrations and Kysely queries against in-memory PostgreSQL using PGlite. Coverage includes user CRUD, input validation, privacy, authentication, owner-only mutations, password-change token invalidation, duplicate/racing registrations, rate limits, cascading deletes, and the new migration's rollback. No external database is required for tests.
+
+
+## Project API
+
+Project reads are public. Creation requires a Bearer token; updates and deletion require the project owner.
+
+| Method | Endpoint | Result |
+| --- | --- | --- |
+| POST | `/api/projects` | 201 with `{ project }` and a Location header |
+| GET | `/api/projects?limit=20&offset=0` | `{ projects, pagination: { limit, offset, has_more } }`; ascending ID by default; maximum limit 100 |
+| GET | `/api/projects/:id` | `{ project }` |
+| PATCH | `/api/projects/:id` | Partial update returning `{ project }` |
+| DELETE | `/api/projects/:id` | 204 without a body |
+
+Create accepts required `title` (trimmed, nonempty, at most 150 characters) and `description` (trimmed, nonempty), plus optional `project_url` and `is_seeking_collaborators`. URLs must use HTTP(S), contain no credentials, and fit within 512 characters; null clears the URL. The collaborator flag must be boolean and defaults to false; omitted URLs default to null. The existing 1 MB JSON body limit applies. Ownership comes from the token; IDs, ownership, timestamps, and other unsupported input fields are rejected.
+
+PATCH requires at least one supported field, preserves omitted fields, and refreshes `updated_at`. Responses contain the project record including ownership and timestamps. Validation errors return 400, invalid/missing authentication 401, another owner's project 403, and missing projects 404. Project mutations share a limit of 60 requests per IP per 15 minutes.
+
+```sh
+curl -i -X POST http://localhost:5000/api/projects \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"My first project","description":"A creative experiment"}'
+
+curl -X PATCH http://localhost:5000/api/projects/1 \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"is_seeking_collaborators":true,"project_url":"https://example.com"}'
+```
+
+Use the ID returned by creation in place of `1`. Deleting a project cascades to its media, tag/skill assignments, likes, saves, comments (including replies), and project-linked collaboration requests. Shared tag/skill catalog entries and unrelated projects remain. Media management, tag/skill assignment, and uploads are separate features.
+
+
+### Project discovery (#54)
+
+The public project feed supports searching titles/descriptions, sorting newest or
+oldest first, and showing only projects seeking collaborators. Search applies on
+form submission; sort/filter changes apply immediately and return to page one.
+Clear filters restores newest-first browsing. Applied filters and pagination are
+stored in the URL, so sharing, reloading, and browser back/forward retain them.
+
+`GET /api/projects` accepts these optional query parameters alongside `limit`
+(default 20, maximum 100) and `offset` (default 0):
+
+| Parameter | Accepted values |
+| --- | --- |
+| `q` | Trimmed search text, at most 200 characters; empty text means no search |
+| `sort` | `newest` or `oldest` |
+| `seeking_collaborators` | `true` or `false`; omit to include both |
+
+Search is a case-insensitive literal substring match across title OR description.
+Percent signs, underscores, and backslashes are literal characters, not wildcard
+operators. Filters combine before pagination. Explicit sorting uses creation time
+and ID as a tie-breaker, with null creation times last. Omitting `sort` preserves
+ascending-ID API ordering; the React feed explicitly requests `newest` by default.
+Malformed/repeated recognized parameters return 400 in the normal JSON error format.
+
+Responses retain existing project fields and add `pagination.has_more`. Next-page
+availability is determined using one extra matching row, without a total count.
+An exactly full final page correctly returns `has_more: false`.
+
+```sh
+curl 'http://localhost:5000/api/projects?q=art&sort=newest&seeking_collaborators=true&limit=20&offset=0'
+```
+
+No database migration is needed. Discovery does not include tag/skill filters,
+recommendations, popularity ranking, or uploads.
+
+## Comment API
+
+Comments and replies are publicly readable. Creation requires a Bearer token; only a comment's author can edit or delete it. Project ownership does not grant comment moderation permissions.
+
+All routes use `/api/projects/:projectId/comments` as their base path:
+
+| Method | Suffix | Result |
+| --- | --- | --- |
+| POST | `/` | 201 with `{ comment }` and a Location header |
+| GET | `/?limit=20&offset=0` | `{ comments, pagination: { limit, offset } }` |
+| GET | `/:commentId` | `{ comment }` |
+| PATCH | `/:commentId` | Content update returning `{ comment }` |
+| DELETE | `/:commentId` | 204 without a body |
+
+Create accepts required `content` and optional `parent_comment_id`. Content is trimmed and must be nonempty text; the 1 MB JSON request limit applies. Omitted or null parents create top-level comments. A parent must be a positive integer ID of an existing comment in the same project. Nested replies are supported. PATCH accepts only `content`, updates `updated_at`, and preserves `created_at`. IDs, ownership, project assignment, parent changes, timestamps, and other unsupported fields are rejected as input.
+
+Responses include `id`, `user_id`, `project_id`, `parent_comment_id`, `content`, `created_at`, and `updated_at`. Lists include all comments and replies as a flat array ordered by ascending ID; clients can reconstruct threads using parent IDs. Pagination defaults to limit 20 and offset 0; maximum limit is 100.
+
+Invalid inputs or cross-project parents return 400, missing/invalid authentication 401, another author's mutation 403, and missing projects/comments/parents 404. A comment requested through another project's URL returns 404. Comment mutations share a limit of 60 requests per IP per 15 minutes; reads are not subject to this mutation limiter.
+
+```sh
+curl -i -X POST http://localhost:5000/api/projects/1/comments \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"content":"Great project!"}'
+
+curl -X POST http://localhost:5000/api/projects/1/comments \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"content":"Thank you!","parent_comment_id":1}'
+
+curl -X PATCH http://localhost:5000/api/projects/1/comments/1 \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"content":"Updated comment"}'
+```
+
+Replace example project/comment IDs with actual IDs. Deleting a comment permanently deletes all descendant replies, including replies written by other users. Deleting a project removes its comments; deleting an account removes its authored comments and their descendant replies. Unrelated comments remain. No schema migration is required for this API.
+
+## React frontend
+
+The client is based on Charlie (`cschicch`)'s `client/` implementation from
+`d7cab9b50d6be693e6da352d156f5deb20232795` on `charlie-sprint2`, merged into main
+by PR #90 (`e85722f`). Authentication, comments, and integration tests extend that
+merged client; Charlie's original authorship remains in the upstream history.
+
+Run `npm run client:install`, then start the backend with `npm run dev` and the
+client with `npm run client:dev` in separate terminals. Visit http://localhost:5173.
+Use Node.js 22.12 or later for the frontend tooling.
+Copy `client/.env.example` to `client/.env` to override `API_PROXY_TARGET` when the
+API runs somewhere other than http://127.0.0.1:5000. Browser requests always use
+relative `/api` paths. Never put database credentials or JWT secrets in client files.
+
+Authentication supports registration, login, logout, and session restoration via
+`/api/users/me`. Tokens live in session storage (per browser tab), expire according
+to the backend, and are removed when the API rejects authenticated requests.
+Protected navigation returns to the intended page after login.
+
+Commands: `npm run client:typecheck`, `npm run client:test`, and
+`npm run client:build`. Existing root commands continue to run the backend.
+
+The frontend includes public project browsing with pagination, owner-only project
+forms/deletion, and threaded comments with posting, replies, editing, and deletion.
+Deleting a project or parent comment asks for confirmation and explains cascading
+deletion. When a reply's parent is outside the loaded comment range, its context
+can be fetched separately. API failures preserve drafts and show actionable errors.
+
+Use Node.js 22.12+ for the frontend tooling. For browser acceptance tests, first run
+`npm exec --prefix client -- playwright install chromium`, then `npm run client:e2e`.
+The Playwright configuration starts the real Express app on port 5001 with a fresh,
+in-memory PGlite database and Vite on port 5174. No PostgreSQL service, `.env`, or
+production database credentials are used. Both ports must be free. The harness is
+separate from normal server startup and is never used by `npm start`.
+
+Frontend unit/component tests use Vitest, Testing Library, and mocked HTTP responses.
+Browser tests cover authentication, project CRUD, comment threads, permissions,
+confirmation cancellation, session expiry, direct routes, mobile navigation, and
+server failures. Browser artifacts are ignored by Git.
+
+`npm run client:build` writes `client/dist/`. Production hosting must serve those
+assets and route `/api` to the Express backend on the same origin. Route other
+non-asset URLs to `client/dist/index.html` for browser-router deep links; do not
+route unknown API requests to the SPA. The Vite proxy is development-only. Hosting
+and deployment are intentionally not configured by this change.
+
+
+## Object storage (#47)
+
+An optional backend AWS S3 foundation provides private object upload/deletion,
+short-lived signed read URLs, and a read-only bucket connectivity check. Enable it
+with `S3_ENABLED=true`, `AWS_REGION`, and `S3_BUCKET_NAME`; URL lifetime defaults to
+900 seconds through `S3_READ_URL_TTL_SECONDS` (1–3600). The SDK resolves credentials
+from your local AWS profile, environment, or deployment IAM role. Database-only
+work continues without AWS configuration when storage is disabled.
+
+See [bucket setup, IAM policy, configuration, and service usage](docs/object-storage.md).
+Once your bucket and credentials are configured, `npm run storage:check` verifies
+bucket access without writing or deleting objects. Live AWS access has not been
+verified by automated tests. Project upload endpoints and frontend image controls
+remain the separate image-upload task (#46); no database migration is introduced.
+
+## Backend regression tests, coverage, and CI (#52)
+
+```sh
+npm ci
+npm test
+npm run test:coverage
+npm run typecheck
+npm run build
+```
+
+The backend suite uses Node's test runner, actual Express HTTP requests, and real
+Kysely queries/migrations against isolated PGlite databases. It covers authentication
+and permissions, project/comment CRUD and discovery, rejected writes preserving
+stored data, user-skill replacement rollback and boundaries, shared mutation rate
+limits, malformed JWT/password hashes, and HTTP parsing/error responses. S3 tests
+use explicit test credentials and mocked SDK calls/local signing; no AWS account,
+external PostgreSQL service, `.env`, or cloud secrets are required.
+
+New HTTP/database regression suites use `src/tests/helpers/testApp.ts`. Each fixture
+gets its own database, migrations, app/rate limiters, and ephemeral HTTP port, with
+HTTP and database cleanup registered even when assertions fail. The helper also
+supports tests of Express middleware through an ephemeral server. Its single-client
+PGlite adapter is for sequential regression checks, not assertions about real
+multi-connection PostgreSQL concurrency. Existing suites remain intact.
+
+`npm run test:coverage` runs the same backend test files with c8 and writes terminal,
+HTML (`coverage/index.html`), and LCOV (`coverage/lcov.info`) reports. Reports and raw
+coverage data are ignored by Git. `.c8rc.json` includes unvisited files when measuring
+app setup, controllers, routes, middleware, security, configuration, and the S3
+service. It excludes test/helpers, database code and migrations, type-only files,
+server/process startup, and the storage-check CLI entrypoint. Those exclusions keep
+the report focused on application logic; migrations and the CLI still execute in
+integration tests. Coverage is reported without a percentage gate in this iteration.
+High coverage does not replace the behavior assertions or prove live AWS behavior.
+
+The backend GitHub Actions workflow (`.github/workflows/backend.yml`) runs for PRs
+into `main` and pushes to `main` or `mokshil`. Its Node.js 22/24 matrix installs the
+root lockfile with `npm ci`, checks types, builds, and runs the coverage suite.
+Coverage artifacts are uploaded separately for each Node version and retained for
+14 days. Test failures fail the job even though artifact upload still runs. The
+workflow uses read-only repository permissions and requires no cloud/database
+secrets. Hosted workflow results become available after the workflow is pushed.
+
+A regression test exposed a skill-ID validation gap: values above PostgreSQL's
+integer range previously reached the database and returned 500. They now return
+400 before any replacement occurs, and existing assignments remain unchanged.

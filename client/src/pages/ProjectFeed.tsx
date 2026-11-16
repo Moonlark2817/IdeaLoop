@@ -1,186 +1,92 @@
-import { useEffect, useState } from "react";
-import ProjectCard from "../components/ProjectCard";
-import { getProjects } from "../api";
-import type { Project } from "../types";
+import { useEffect, useState, type FormEvent } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { getProjects } from '../api';
+import { feedSearchParams, readFeedFilters, type FeedFilters } from '../projectDiscovery';
+import ProjectCard from '../components/ProjectCard';
+import type { Project } from '../types';
+
+interface FeedResult {
+  key: string;
+  status: 'loading' | 'ready' | 'error';
+  projects: Project[];
+  hasMore: boolean;
+  error: string;
+}
 
 export default function ProjectFeed() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<"newest" | "oldest">("newest");
-  const [seekingCollaborators, setSeekingCollaborators] = useState<
-    "true" | "false" | ""
-  >("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [params, setParams] = useSearchParams();
+  const filters = readFeedFilters(params);
+  const {q, sort, seekingCollaborators, offset} = filters;
+  const canonical = feedSearchParams(filters).toString();
+  const [draft, setDraft] = useState(q);
+  const [seekingChecked, setSeekingChecked] = useState(seekingCollaborators);
+  const [attempt, setAttempt] = useState(0);
+  const [result, setResult] = useState<FeedResult>({key: canonical, status: 'loading', projects: [], hasMore: false, error: ''});
+
+  useEffect(() => {setDraft(q);}, [q]);
+  useEffect(() => {setSeekingChecked(seekingCollaborators);}, [seekingCollaborators]);
+  useEffect(() => {
+    if (params.toString() !== canonical) setParams(canonical, {replace: true});
+  }, [params, canonical, setParams]);
 
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
+    setResult({key: canonical, status: 'loading', projects: [], hasMore: false, error: ''});
+    getProjects({q, sort, seekingCollaborators: seekingCollaborators ? true : undefined, offset}, controller.signal)
+      .then(data => {
+        if (!controller.signal.aborted) setResult({key: canonical, status: 'ready', projects: data.projects, hasMore: data.pagination.has_more, error: ''});
+      })
+      .catch(error => {
+        if (!controller.signal.aborted) setResult({key: canonical, status: 'error', projects: [], hasMore: false, error: error.message});
+      });
+    return () => controller.abort();
+  }, [canonical, q, sort, seekingCollaborators, offset, attempt]);
 
-    async function loadProjects() {
-      setLoading(true);
-      setError("");
-
-      try {
-        const data = await getProjects({
-          search,
-          sort,
-          seekingCollaborators
-        });
-
-        if (active) {
-          setProjects(data);
-        }
-      } catch (err) {
-        if (active) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Unable to load projects."
-          );
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadProjects();
-
-    return () => {
-      active = false;
-    };
-  }, [search, sort, seekingCollaborators]);
-
-  function clearFilters() {
-    setSearch("");
-    setSort("newest");
-    setSeekingCollaborators("");
+  function apply(changes: Partial<FeedFilters>) {
+    setParams(feedSearchParams({...filters, ...changes, offset: 0}));
   }
+  function search(event: FormEvent) {
+    event.preventDefault();
+    const value = draft.trim();
+    if (value.length <= 200 && !value.includes('\0')) apply({q: value});
+  }
+  function clear() {
+    setDraft('');
+    setSeekingChecked(false);
+    setParams({});
+  }
+  const loading = result.key !== canonical || result.status === 'loading';
+  const filtered = Boolean(q || seekingCollaborators);
 
-  const hasFilters =
-    search.trim() !== "" ||
-    sort !== "newest" ||
-    seekingCollaborators !== "";
-
-  return (
-    <main className="page-container">
-      <section className="feed-header">
-        <div>
-          <p className="eyebrow">DISCOVER AND CREATE</p>
-          <h1>Explore Projects</h1>
-          <p className="subtitle">
-            Discover what people are creating and find your next collaboration.
-          </p>
-        </div>
-      </section>
-
-      <section className="feed-toolbar">
-        <div className="discovery-search">
-          <label htmlFor="project-search">Search projects</label>
-
-          <input
-            id="project-search"
-            type="search"
-            placeholder="Search by project title or description..."
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </div>
-
-        <div className="discovery-filters">
-          <div>
-            <label htmlFor="project-sort">Sort by</label>
-
-            <select
-              id="project-sort"
-              value={sort}
-              onChange={(event) =>
-                setSort(event.target.value as "newest" | "oldest")
-              }
-            >
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="collaborator-filter">
-              Collaboration status
-            </label>
-
-            <select
-              id="collaborator-filter"
-              value={seekingCollaborators}
-              onChange={(event) =>
-                setSeekingCollaborators(
-                  event.target.value as "true" | "false" | ""
-                )
-              }
-            >
-              <option value="">All projects</option>
-              <option value="true">Seeking collaborators</option>
-              <option value="false">Not seeking collaborators</option>
-            </select>
-          </div>
-
-          <button
-            type="button"
-            className="clear-filters-button"
-            onClick={clearFilters}
-            disabled={!hasFilters}
-          >
-            Clear filters
-          </button>
-        </div>
-      </section>
-
-      {loading && (
-        <p className="status-message">Loading projects...</p>
-      )}
-
-      {error && (
-        <p className="error-message">{error}</p>
-      )}
-
-      {!loading && !error && projects.length === 0 && (
-        <div className="empty-state">
-          <h2>No projects found</h2>
-
-          <p>
-            {hasFilters
-              ? "Try changing your search or filters."
-              : "Be the first to share a project with the community."}
-          </p>
-
-          {hasFilters && (
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={clearFilters}
-            >
-              Clear filters
-            </button>
-          )}
-        </div>
-      )}
-
-      {!loading && !error && projects.length > 0 && (
-        <>
-          <p className="project-results-count">
-            {projects.length} {projects.length === 1 ? "project" : "projects"} found
-          </p>
-
-          <section className="project-grid">
-            {projects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-              />
-            ))}
-          </section>
-        </>
-      )}
-    </main>
-  );
+  return <main className="page-container">
+    <header className="feed-header">
+      <div><p className="eyebrow">CREATE · SHARE · CONNECT</p><h1>Community projects</h1><p className="subtitle">Discover what the IdeaLoop community is building.</p></div>
+      <Link className="primary-button" to="/projects/new">Create project</Link>
+    </header>
+    <section className="discovery-controls" aria-label="Discover projects">
+      <form onSubmit={search} className="discovery-search" role="search">
+        <label htmlFor="project-search">Search projects</label>
+        <div className="search-actions"><input id="project-search" type="search" maxLength={200} placeholder="Search titles and descriptions" value={draft} onChange={event => setDraft(event.target.value)} /><button className="primary-button" type="submit">Search</button></div>
+      </form>
+      <div className="discovery-filters">
+        <div><label htmlFor="project-sort">Sort projects</label><select id="project-sort" value={sort} onChange={event => apply({sort: event.target.value as FeedFilters['sort']})}><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></div>
+        <label className="checkbox-group"><input type="checkbox" checked={seekingChecked} onChange={event => {
+          // Update the native control immediately while URL navigation is scheduled.
+          const checked = event.target.checked;
+          setSeekingChecked(checked);
+          apply({seekingCollaborators: checked});
+        }} />Seeking collaborators only</label>
+        <button type="button" className="secondary-button" onClick={clear}>Clear filters</button>
+      </div>
+    </section>
+    {loading ? <p role="status">Loading projects…</p> : result.status === 'error' ? <div role="alert"><p className="error-message">{result.error}</p><button onClick={() => setAttempt(n => n + 1)}>Retry</button></div> : <>
+      <p role="status">{result.projects.length ? `Showing ${result.projects.length} projects · Page ${Math.floor(offset / 20) + 1}` : filtered ? 'No projects match your filters.' : offset ? 'No projects on this page.' : 'No projects yet. Share the first one!'}</p>
+      <div className="project-grid">{result.projects.map(project => <ProjectCard key={project.id} project={project} />)}</div>
+      <div className="form-actions" aria-label="Project pagination">
+        <button className="secondary-button" disabled={!offset} onClick={() => setParams(feedSearchParams({...filters, offset: Math.max(0, offset - 20)}))}>Previous</button>
+        <span>Page {Math.floor(offset / 20) + 1}</span>
+        <button className="secondary-button" disabled={!result.hasMore || offset > 2147483647 - 20} onClick={() => setParams(feedSearchParams({...filters, offset: offset + 20}))}>Next</button>
+      </div>
+    </>}
+  </main>;
 }
