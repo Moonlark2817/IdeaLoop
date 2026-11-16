@@ -198,9 +198,12 @@ export default function Profile() {
           )}
 
           {isOwner && (
-            <button type="button" onClick={startEditing}>
-              Edit profile
-            </button>
+            <p>
+              <button type="button" onClick={startEditing}>
+                Edit profile
+              </button>{" "}
+              <Link to="/saved">Saved projects</Link>
+            </p>
           )}
         </>
       ) : (

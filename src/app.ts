@@ -7,6 +7,7 @@ import { createUserRoutes } from './routes/userRoutes.js';
 import { createCommentRoutes } from './routes/commentRoutes.js';
 import { createProjectRoutes } from './routes/projectRoutes.js';
 import { createSkillRoutes } from './routes/skillRoutes.js';
+import { createEngagementRoutes, createSavedProjectRoutes } from './routes/engagementRoutes.js';
 
 import {
   createErrorHandler,
@@ -68,6 +69,8 @@ export function createApp({
     app.use('/api/auth', routes.auth);
     app.use('/api/skills', createSkillRoutes(users.db));
     app.use('/api/projects/:projectId/comments', createCommentRoutes(users.db, users.jwtSecret));
+    app.use('/api/projects/:projectId/engagement', createEngagementRoutes(users.db, users.jwtSecret));
+    app.use('/api/saved-projects', createSavedProjectRoutes(users.db, users.jwtSecret));
     app.use('/api/projects', createProjectRoutes(users.db, users.jwtSecret));
   }
 
